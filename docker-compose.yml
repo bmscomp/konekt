@@ -26,8 +26,8 @@ services:
     hostname: broker
     container_name: broker
     ports:
-      - "9092:9092"
-      - "9101:9101"
+      - 9092:9092
+      - 9101:9101
     environment:
       KAFKA_NODE_ID: 1
       KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: 'CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT'
@@ -55,7 +55,7 @@ services:
     depends_on:
       - broker
     ports:
-      - "8081:8081"
+      - 8081:8081
     environment:
       SCHEMA_REGISTRY_HOST_NAME: schema-registry
       SCHEMA_REGISTRY_KAFKASTORE_BOOTSTRAP_SERVERS: 'broker:29092'
@@ -69,7 +69,7 @@ services:
       - broker
       - schema-registry
     ports:
-      - "8083:8083"
+      - 8083:8083
     environment:
       CONNECT_BOOTSTRAP_SERVERS: 'broker:29092'
       CONNECT_REST_ADVERTISED_HOST_NAME: connect
@@ -99,7 +99,7 @@ services:
       - schema-registry
       - connect
     ports:
-      - "9021:9021"
+      - 9021:9021
     environment:
       CONTROL_CENTER_BOOTSTRAP_SERVERS: 'broker:29092'
       CONTROL_CENTER_CONNECT_CONNECT-DEFAULT_CLUSTER: 'connect:8083'
