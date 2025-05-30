@@ -90,15 +90,6 @@ services:
       CONFLUENT_METRICS_TOPIC_REPLICATION: 1
       PORT: 9021
 
-  ksqldb-cli:
-    image: confluentinc/cp-ksqldb-cli:7.9.0
-    container_name: ksqldb-cli
-    depends_on:
-      - broker
-      - connect
-    entrypoint: /bin/sh
-    tty: true
-
   rest-proxy:
     image: confluentinc/cp-kafka-rest:7.9.0
     depends_on:
