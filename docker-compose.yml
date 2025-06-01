@@ -1,9 +1,27 @@
 ---
 services:
 
+  # SQL Server service 
+  sqlserver:
+    image: mcr.microsoft.com/mssql/server:2022-latest
+    container_name: sqlserver
+    environment:
+      - ACCEPT_EULA=Y
+      - MSSQL_SA_PASSWORD=YourStrong!Passw0rd
+      - MSSQL_PID=Developer
+    ports:
+      - 1433:1433
+    volumes:
+      - sqlserver_data:/var/opt/mssql
+    healthcheck:
+      test: ["CMD", "sqlcmd", "-U", "sa", "-P", "YourStrong!Passw0rd", "-Q", "SELECT 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
   # MongoDB service
   mongo:
-    image: mongo:latest
+    image: mongo:6.0
     container_name: mongo
     environment:
       - MONGO_INITDB_ROOT_USERNAME=root
@@ -111,5 +129,6 @@ services:
       PORT: 9021
 
 volumes:
+  sqlserver_data:
   mongo_data:
-    driver: local
+    
