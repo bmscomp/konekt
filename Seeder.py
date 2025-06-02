@@ -1,6 +1,7 @@
 import os
 import json
 import zipfile
+from dotenv import load_dotenv
 from pymongo import MongoClient
 from kaggle.api.kaggle_api_extended import KaggleApi
 
@@ -17,9 +18,18 @@ def setup_kaggle():
     print("Dataset downloaded successfully")
 
 def process_json_to_mongodb():
+
+    load_dotenv()  # Load from .env file
+
     """Process JSON files and insert into MongoDB"""
     # Connect to local MongoDB
-    client = MongoClient('mongodb://localhost:27017/')
+    client = MongoClient(
+        host='mongodb://localhost:27017/',
+        username=os.getenv('MONGO_USERNAME'),  # or replace with actual username
+        password=os.getenv('MONGO_PASSWORD'),  # or replace with actual password
+        authSource='admin',  # The authentication database (usually 'admin')
+        authMechanism='SCRAM-SHA-256'  # Default modern auth mechanism
+    )
     db = client['kaggle_db']
     
     # Process each JSON file in the downloaded data directory
