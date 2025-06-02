@@ -7,7 +7,7 @@ services:
     container_name: sqlserver
     environment:
       - ACCEPT_EULA=Y
-      - MSSQL_SA_PASSWORD=!Passw0rd11
+      - MSSQL_SA_PASSWORD=Seeqwa1!Passw0rd
     ports:
       - 1433:1433
     volumes:

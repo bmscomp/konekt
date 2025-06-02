@@ -1,0 +1,7 @@
+dask==2023.11.0  # for out-of-core DataFrames
+memory_profiler==0.61.0  # memory usage monitoring
+
+# Strict version pins for production
+pymongo==4.13.0
+pandas==2.2.3
+kaggle==1.7.4.5
