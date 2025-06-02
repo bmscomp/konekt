@@ -1,4 +1,4 @@
-# Konekt Data Processing Project
+# Konekt make you data synched with Kafka and Kafka connect
 
 This project demonstrates a scalable data processing pipeline using Kafka, MongoDB, and Python. It includes several Kafka consumer implementations and a data seeder for MongoDB.
 
@@ -123,9 +123,9 @@ python Seeder.py
 
 This script:
 - Authenticates with the Kaggle API
-- Downloads a Wikipedia dataset
-- Processes the CSV files
-- Inserts the data into MongoDB
+- Downloads a dataset from Kaggle
+- Processes JSON files (supports both JSON arrays and JSON Lines format)
+- Inserts the data into MongoDB in batches
 
 ### 2. Run Kafka Consumers
 

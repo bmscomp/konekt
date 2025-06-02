@@ -1,6 +1,6 @@
 import os
+import json
 import zipfile
-import pandas as pd
 from pymongo import MongoClient
 from kaggle.api.kaggle_api_extended import KaggleApi
 
@@ -16,28 +16,62 @@ def setup_kaggle():
     
     print("Dataset downloaded successfully")
 
-def process_csv_to_mongodb():
-    """Process CSV files and insert into MongoDB"""
+def process_json_to_mongodb():
+    """Process JSON files and insert into MongoDB"""
     # Connect to local MongoDB
     client = MongoClient('mongodb://localhost:27017/')
-    db = client['wikipedia_db']
+    db = client['kaggle_db']
     
-    # Process each CSV file in the downloaded data directory
+    # Process each JSON file in the downloaded data directory
     data_dir = './data'
     for filename in os.listdir(data_dir):
-        if filename.endswith('.csv'):
+        if filename.endswith('.json'):
             collection_name = os.path.splitext(filename)[0]
             
-            # Read CSV in chunks for large files
-            chunk_size = 10000
-            for chunk in pd.read_csv(os.path.join(data_dir, filename), chunksize=chunk_size):
-                # Convert DataFrame to dictionary records
-                records = chunk.to_dict('records')
-                
-                # Insert into MongoDB collection
-                if records:
-                    db[collection_name].insert_many(records)
-                    print(f"Inserted {len(records)} records into {collection_name}")
+            # Read JSON file
+            file_path = os.path.join(data_dir, filename)
+            print(f"Processing {file_path}...")
+            
+            try:
+                # For large files, we'll process in batches
+                with open(file_path, 'r', encoding='utf-8') as file:
+                    # Check if the file contains a JSON array or a JSON object per line
+                    first_char = file.read(1)
+                    file.seek(0)  # Reset file pointer
+                    
+                    if first_char == '[':
+                        # File contains a JSON array
+                        data = json.load(file)
+                        
+                        # Process in batches of 1000 records
+                        batch_size = 1000
+                        for i in range(0, len(data), batch_size):
+                            batch = data[i:i+batch_size]
+                            if batch:
+                                db[collection_name].insert_many(batch)
+                                print(f"Inserted {len(batch)} records into {collection_name}")
+                    else:
+                        # File contains JSON objects, one per line (JSON Lines format)
+                        batch = []
+                        for line_number, line in enumerate(file):
+                            try:
+                                record = json.loads(line.strip())
+                                batch.append(record)
+                                
+                                # Insert in batches of 1000
+                                if len(batch) >= 1000:
+                                    db[collection_name].insert_many(batch)
+                                    print(f"Inserted {len(batch)} records into {collection_name}")
+                                    batch = []
+                            except json.JSONDecodeError as e:
+                                print(f"Error decoding JSON on line {line_number+1}: {e}")
+                        
+                        # Insert any remaining records
+                        if batch:
+                            db[collection_name].insert_many(batch)
+                            print(f"Inserted {len(batch)} records into {collection_name}")
+            except Exception as e:
+                print(f"Error processing {filename}: {e}")
     
     print("All data processed and inserted into MongoDB")
 
@@ -46,7 +80,7 @@ def main():
     setup_kaggle()
     
     # Step 2: Process and insert into MongoDB
-    process_csv_to_mongodb()
+    process_json_to_mongodb()
 
 if __name__ == '__main__':
     main()
