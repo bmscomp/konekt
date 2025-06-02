@@ -1,6 +1,5 @@
 import os
 import json
-import zipfile
 from dotenv import load_dotenv
 from pymongo import MongoClient
 from kaggle.api.kaggle_api_extended import KaggleApi
@@ -30,14 +29,14 @@ def process_json_to_mongodb():
         authSource='admin',  # The authentication database (usually 'admin')
         authMechanism='SCRAM-SHA-256'  # Default modern auth mechanism
     )
-    db = client['kaggle_db']
+
+    db = client['wikipedia']  # Use or create a database named 'wikipedia'
     
     # Process each JSON file in the downloaded data directory
     data_dir = './data'
     for filename in os.listdir(data_dir):
+        collection_name = 'pages'
         if filename.endswith('.json'):
-            collection_name = os.path.splitext(filename)[0]
-            
             # Read JSON file
             file_path = os.path.join(data_dir, filename)
             print(f"Processing {file_path}...")
@@ -54,7 +53,7 @@ def process_json_to_mongodb():
                         data = json.load(file)
                         
                         # Process in batches of 1000 records
-                        batch_size = 1000
+                        batch_size = 100000
                         for i in range(0, len(data), batch_size):
                             batch = data[i:i+batch_size]
                             if batch:
@@ -68,8 +67,8 @@ def process_json_to_mongodb():
                                 record = json.loads(line.strip())
                                 batch.append(record)
                                 
-                                # Insert in batches of 1000
-                                if len(batch) >= 1000:
+                                # Insert in batches of 10000
+                                if len(batch) >= 100000:
                                     db[collection_name].insert_many(batch)
                                     print(f"Inserted {len(batch)} records into {collection_name}")
                                     batch = []
@@ -86,8 +85,6 @@ def process_json_to_mongodb():
     print("All data processed and inserted into MongoDB")
 
 def main():
-    # Step 1: Download dataset from Kaggle
-    setup_kaggle()
     
     # Step 2: Process and insert into MongoDB
     process_json_to_mongodb()
