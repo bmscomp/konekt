@@ -1,4 +1,4 @@
-# Kafka-MongoDB Data Processing Project
+# Konekt Data Processing Project
 
 This project demonstrates a scalable data processing pipeline using Kafka, MongoDB, and Python. It includes several Kafka consumer implementations and a data seeder for MongoDB.
 
