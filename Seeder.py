@@ -10,8 +10,8 @@ def setup_kaggle():
     api = KaggleApi()
     api.authenticate()
     
-    # Download Wikipedia dataset (example: 'jiashenliu/wikipedia-structure')
-    dataset = 'jiashenliu/wikipedia-structure'
+    # Download Wikipedia dataset (example: 'wikimedia-foundation/wikipedia-structured-contents/data')
+    dataset = 'wikimedia-foundation/wikipedia-structured-contents/data'
     api.dataset_download_files(dataset, path='./data', unzip=True)
     
     print("Dataset downloaded successfully")
