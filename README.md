@@ -194,3 +194,8 @@ curl -X POST -H "Content-Type: application/json" --data @mongo-source-connector.
 openssl rand -base64 756 > mongodb-keyfile
 chmod 400 mongodb-keyfile  # Restrict permissions
 chmod +x scripts/setup.sh
+
+
+## Mongo db connection
+
+mongodb://localhost:27017,localhost:27018,localhost:27019/?replicaSet=rs0&authSource=admin

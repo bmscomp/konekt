@@ -5,6 +5,7 @@ echo "Waiting for MongoDB instances to start..."
 sleep 30
 
 echo "Initiating replica set..."
+
 mongosh --host mongo:27017 -u root -p rootpassword --authenticationDatabase admin --eval "
 try {
   rs.status();

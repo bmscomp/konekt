@@ -81,11 +81,12 @@ def load_jsonl_files_to_mongodb(data_directory, db, collection, mongodb_uri,
 
 def main():
     # Configuration variables - modify these as needed
-    DATA_DIRECTORY = "./data"                     # Directory containing your .jsonl files
+    DATA_DIRECTORY = "./data"                   # Directory containing your .jsonl files
     DB_NAME = "wikipedia"                       # MongoDB database name
     COLLECTION_NAME = "pages"                   # MongoDB collection name
-    MONGODB_URI = "mongodb://localhost:27017/"  # MongoDB connection URI
-    BATCH_SIZE = 100000                         # Number of documents to insert at once
+    # MongoDB connection URI
+    MONGODB_URI = "mongodb://localhost:27017/?replicaSet=rs0"  
+    BATCH_SIZE = 10000                          # Number of documents to insert at once
     USERNAME = "root"                           # MongoDB username (None if no auth)
     PASSWORD = "rootpassword"                   # MongoDB password (None if no auth)
     AUTH_SOURCE = "admin"                       # Authentication database
