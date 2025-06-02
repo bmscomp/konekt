@@ -19,9 +19,11 @@ services:
       retries: 5
     restart: unless-stopped
   # MongoDB service
+
   mongo:
-    image: mongo:6.0
+    image: mongo:7.0
     container_name: mongo
+    command: ["--replSet", "rs0", "--bind_ip_all", "--port", "27017", "--keyFile", "/data/keyfile"]
     environment:
       - MONGO_INITDB_ROOT_USERNAME=root
       - MONGO_INITDB_ROOT_PASSWORD=rootpassword
@@ -29,14 +31,46 @@ services:
     volumes:
       - mongo_data:/data/db
       - ./mongo-init:/docker-entrypoint-initdb.d
+      - ./mongodb-keyfile:/data/keyfile:ro
     ports:
       - 27017:27017
     healthcheck:
-      test: echo 'db.runCommand("ping").ok' | mongosh -u root -p rootpassword --quiet
+      test: echo "try { rs.status() } catch (err) { rs.initiate({_id:'rs0',members:[{_id:0,host:'mongo:27017',priority:1},{_id:1,host:'second:27017',priority:0.5},{_id:2,host:'third:27017',priority:0.5}]}) }" | mongosh --port 27017 --quiet
       interval: 5s
-      timeout: 5s
-      retries: 5
-    restart: unless-stopped
+      timeout: 30s
+      start_period: 30s
+      start_interval: 1s
+      retries: 30
+    networks:
+      - mongo-cluster
+
+  second:
+    image: mongo:7.0
+    container_name: second
+    command: ["--replSet", "rs0", "--bind_ip_all", "--port", "27017", "--keyFile", "/data/keyfile"]
+    volumes:
+      - ./data/second:/data/db
+      - ./mongodb-keyfile:/data/keyfile:ro
+    ports:
+      - 27018:27017
+    depends_on:
+      - mongo
+    networks:
+      - mongo-cluster
+
+  third:
+    image: mongo:7.0 
+    container_name: third
+    command: ["--replSet", "rs2", "--bind_ip_all", "--port", "27017", "--keyFile", "/data/keyfile"]
+    volumes:
+      - ./data/third:/data/db
+      - ./mongodb-keyfile:/data/keyfile:ro
+    ports:
+      - 27019:27017
+    depends_on:
+      - mongo
+    networks:
+      - mongo-cluster
 
   broker:
     image: confluentinc/cp-kafka:7.9.0
@@ -65,6 +99,7 @@ services:
       # See https://docs.confluent.io/kafka/operations-tools/kafka-tools.html#kafka-storage-sh
       CLUSTER_ID: 'MkU3OEVBNTcwNTJENDM2Qk'
 
+
   schema-registry:
     image: confluentinc/cp-schema-registry:7.9.0
     hostname: schema-registry
@@ -79,18 +114,21 @@ services:
       SCHEMA_REGISTRY_LISTENERS: http://0.0.0.0:8081
 
   connect:
-    image: cnfldemos/cp-server-connect-datagen:0.6.4-7.6.0
+    image: confluentinc/cp-kafka-connect:latest
     hostname: connect
     container_name: connect
     depends_on:
       - broker
       - schema-registry
+    volumes:
+    - ./mongo-source-connector.json:/tmp/mongo-source-connector.json
     ports:
       - 8083:8083
     environment:
       CONNECT_BOOTSTRAP_SERVERS: 'broker:29092'
       CONNECT_REST_ADVERTISED_HOST_NAME: connect
       CONNECT_GROUP_ID: compose-connect-group
+      CONNECT_PLUGIN_PATH: /usr/share/java,/usr/share/confluent-hub-components
       CONNECT_CONFIG_STORAGE_TOPIC: docker-connect-configs
       CONNECT_CONFIG_STORAGE_REPLICATION_FACTOR: 1
       CONNECT_OFFSET_FLUSH_INTERVAL_MS: 10000
@@ -105,8 +143,28 @@ services:
       CLASSPATH: /usr/share/java/monitoring-interceptors/monitoring-interceptors-7.9.0.jar
       CONNECT_PRODUCER_INTERCEPTOR_CLASSES: "io.confluent.monitoring.clients.interceptor.MonitoringProducerInterceptor"
       CONNECT_CONSUMER_INTERCEPTOR_CLASSES: "io.confluent.monitoring.clients.interceptor.MonitoringConsumerInterceptor"
-      CONNECT_PLUGIN_PATH: "/usr/share/java,/usr/share/confluent-hub-components"
-
+      LOG4J_LOGGERS: org.apache.kafka.connect.runtime.rest=WARN,org.reflections=ERROR
+      LOG4J_ROOT_LOGLEVEL: WARN
+    command: 
+      - bash
+      - -c
+      - |
+        # Install MongoDB connector
+        echo "Installing MongoDB Kafka Connector..."
+        confluent-hub install --no-prompt mongodb/kafka-connect-mongodb:latest
+        
+        # Start Kafka Connect with all connectors
+        /etc/confluent/docker/run &
+        
+        # Wait for Kafka Connect to start
+        sleep 30
+        
+        # Create MongoDB source connector
+        echo "Creating MongoDB Source Connector..."
+        curl -X POST -H "Content-Type: application/json" --data @/tmp/mongo-source-connector.json http://connect:8083/connectors
+        
+        # Keep container running
+        sleep infinity
   control-center:
     image: confluentinc/cp-enterprise-control-center:7.9.0
     hostname: control-center
@@ -130,3 +188,9 @@ services:
 volumes:
   sqlserver_data:
   mongo_data:
+  second-data:
+  third-data:
+
+networks:
+  mongo-cluster:
+    driver: bridge

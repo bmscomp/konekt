@@ -1,0 +1,58 @@
+services:
+  mongo:
+    image: mongo:7.0
+    container_name: mongo
+    command: ["--replSet", "rs0", "--bind_ip_all", "--port", "27017"]
+    environment:
+      - MONGO_INITDB_ROOT_USERNAME=root
+      - MONGO_INITDB_ROOT_PASSWORD=rootpassword
+      - MONGO_INITDB_DATABASE=store
+    volumes:
+      - mongo_data:/data/db
+      - ./mongo-init:/docker-entrypoint-initdb.d
+    ports:
+      - 27017:27017
+    healthcheck:
+      test: echo "try { rs.status() } catch (err) { rs.initiate({_id:'rs0',members:[{_id:0,host:'mongo:27017',priority:1},{_id:1,host:'second:27017',priority:0.5},{_id:2,host:'third:27017',priority:0.5}]}) }" | mongosh --port 27017 --quiet
+      interval: 5s
+      timeout: 30s
+      start_period: 30s
+      start_interval: 1s
+      retries: 30
+    networks:
+      - mongo-cluster
+
+  second:
+    image: mongo:7.0
+    container_name: second
+    command: ["--replSet", "rs1", "--bind_ip_all", "--port", "27017"]
+    volumes:
+      - ./data/second:/data/db
+    ports:
+      - 27018:27017
+    depends_on:
+      - mongo
+    networks:
+      - mongo-cluster
+
+  third:
+    image: mongo:7.0 
+    container_name: third
+    command: ["--replSet", "rs2", "--bind_ip_all", "--port", "27017"]
+    volumes:
+      - ./data/third:/data/db
+    ports:
+      - 27019:27017
+    depends_on:
+      - mongo
+    networks:
+      - mongo-cluster
+
+networks:
+  mongo-cluster:
+    driver: bridge
+
+volumes:
+  mongo_data:
+  second-data:
+  third-data:

@@ -184,3 +184,12 @@ You can customize the consumer behavior by modifying the following parameters in
 - Add new consumer implementations by extending the base `ScalableKafkaConsumer` class
 - Modify the MongoDB initialization script to create additional collections
 - Add new data sources to the Seeder.py script
+
+## Some implementation 
+
+curl -X POST -H "Content-Type: application/json" --data @mongo-source-connector.json http://localhost:8083/connectors
+
+## Mongo Key file for replicaSet
+
+openssl rand -base64 756 > mongodb-keyfile
+chmod 400 mongodb-keyfile  # Restrict permissions

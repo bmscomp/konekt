@@ -1,3 +1,24 @@
+// In MongoDB shell:
+rs.initiate({
+  _id: "rs0",
+  members: [{ _id: 0, host: "mongodb:27017" }]
+})
+
+db.createRole({
+  role: "changeStreamRole",
+  privileges: [
+    { resource: { db: "", collection: "" }, actions: ["find", "changeStream"] }
+  ],
+  roles: []
+})
+
+db.createUser({
+  user: "kafka",
+  pwd: "kafkapassword",
+  roles: ["changeStreamRole", "readWrite@wikipedia"]
+})
+
+
 db = db.getSiblingDB('store');
 
 // Create application user with readWrite access to store database
