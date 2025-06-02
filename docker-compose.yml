@@ -13,7 +13,7 @@ services:
     volumes:
       - sqlserver_data:/var/opt/mssql
     healthcheck:
-      test: ["CMD", "sqlcmd", "-U", "sa", "-P", "YourStrong!Passw0rd", "-Q", "SELECT 1"]
+      test: ["CMD", "sqlcmd", "-U", "sa", "-P", "Seeqwa1!Passw0rd", "-Q", "SELECT 1"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -57,11 +57,16 @@ services:
       - mongo
     networks:
       - mongo-cluster
-
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+        reservations:
+          memory: 512M
   third:
     image: mongo:7.0 
     container_name: third
-    command: ["--replSet", "rs2", "--bind_ip_all", "--port", "27017", "--keyFile", "/data/keyfile"]
+    command: ["--replSet", "rs0", "--bind_ip_all", "--port", "27017", "--keyFile", "/data/keyfile"]
     volumes:
       - ./data/third:/data/db
       - ./mongodb-keyfile:/data/keyfile:ro
@@ -71,7 +76,31 @@ services:
       - mongo
     networks:
       - mongo-cluster
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+        reservations:
+          memory: 512M
 
+  mongo-setup:
+    image: mongo:7.0
+    container_name: mongo-setup
+    depends_on:
+      - mongo
+      - second
+      - third
+    volumes:
+      - ./scripts:/scripts
+    networks:
+      - mongo-cluster
+    entrypoint: ["bash", "/scripts/setup.sh"]
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+        reservations:
+          memory: 512M
   broker:
     image: confluentinc/cp-kafka:7.9.0
     hostname: broker
@@ -139,7 +168,6 @@ services:
       CONNECT_KEY_CONVERTER: org.apache.kafka.connect.storage.StringConverter
       CONNECT_VALUE_CONVERTER: io.confluent.connect.avro.AvroConverter
       CONNECT_VALUE_CONVERTER_SCHEMA_REGISTRY_URL: http://schema-registry:8081
-      # CLASSPATH required due to CC-2422
       CLASSPATH: /usr/share/java/monitoring-interceptors/monitoring-interceptors-7.9.0.jar
       CONNECT_PRODUCER_INTERCEPTOR_CLASSES: "io.confluent.monitoring.clients.interceptor.MonitoringProducerInterceptor"
       CONNECT_CONSUMER_INTERCEPTOR_CLASSES: "io.confluent.monitoring.clients.interceptor.MonitoringConsumerInterceptor"
