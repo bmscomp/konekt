@@ -41,8 +41,6 @@ services:
       start_period: 30s
       start_interval: 1s
       retries: 30
-    networks:
-      - mongo-cluster
 
   second:
     image: mongo:7.0
@@ -55,14 +53,18 @@ services:
       - 27018:27017
     depends_on:
       - mongo
-    networks:
-      - mongo-cluster
     deploy:
       resources:
         limits:
           memory: 1G
         reservations:
           memory: 512M
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.hello()"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s    
   third:
     image: mongo:7.0 
     container_name: third
@@ -74,15 +76,18 @@ services:
       - 27019:27017
     depends_on:
       - mongo
-    networks:
-      - mongo-cluster
     deploy:
       resources:
         limits:
           memory: 1G
         reservations:
           memory: 512M
-
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.hello()"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
   mongo-setup:
     image: mongo:7.0
     container_name: mongo-setup
@@ -92,8 +97,6 @@ services:
       - third
     volumes:
       - ./scripts:/scripts
-    networks:
-      - mongo-cluster
     entrypoint: ["bash", "/scripts/setup.sh"]
     deploy:
       resources:
@@ -124,6 +127,16 @@ services:
       KAFKA_INTER_BROKER_LISTENER_NAME: 'PLAINTEXT'
       KAFKA_CONTROLLER_LISTENER_NAMES: 'CONTROLLER'
       KAFKA_LOG_DIRS: '/tmp/kraft-combined-logs'
+      # Main message size setting (3MB)
+      KAFKA_MESSAGE_MAX_BYTES: 3145728
+      KAFKA_REPLICA_FETCH_MAX_BYTES: 3145728
+      KAFKA_MAX_REQUEST_SIZE: 3145728
+      
+      # Socket and log settings
+      KAFKA_SOCKET_SEND_BUFFER_BYTES: 1048576
+      KAFKA_SOCKET_RECEIVE_BUFFER_BYTES: 1048576
+      KAFKA_LOG_SEGMENT_BYTES: 134217728
+
       # Replace CLUSTER_ID with a unique base64 UUID using "bin/kafka-storage.sh random-uuid"
       # See https://docs.confluent.io/kafka/operations-tools/kafka-tools.html#kafka-storage-sh
       CLUSTER_ID: 'MkU3OEVBNTcwNTJENDM2Qk'
@@ -218,7 +231,3 @@ volumes:
   mongo_data:
   second-data:
   third-data:
-
-networks:
-  mongo-cluster:
-    driver: bridge

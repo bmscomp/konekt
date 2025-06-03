@@ -24,7 +24,7 @@ def load_jsonl_files_to_mongodb(data_directory, db, collection, mongodb_uri,
         mongodb_uri,
         username=username,
         password=password,
-        authSource=auth_source
+        authSource=auth_source # Adjust if not using replica set
     )
     db = client[db]
     collection = db[collection]
@@ -86,7 +86,7 @@ def main():
     COLLECTION_NAME = "pages"                   # MongoDB collection name
     # MongoDB connection URI
     MONGODB_URI = "mongodb://localhost:27017/?replicaSet=rs0"  
-    BATCH_SIZE = 10000                          # Number of documents to insert at once
+    BATCH_SIZE = 100000                         # Number of documents to insert at once
     USERNAME = "root"                           # MongoDB username (None if no auth)
     PASSWORD = "rootpassword"                   # MongoDB password (None if no auth)
     AUTH_SOURCE = "admin"                       # Authentication database
