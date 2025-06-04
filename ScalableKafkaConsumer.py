@@ -8,7 +8,7 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 class ScalableKafkaConsumer:
-    
+
     def __init__(self, topic, bootstrap_servers, group_id, num_workers=4):
         self.topic = topic
         self.bootstrap_servers = bootstrap_servers
@@ -23,7 +23,7 @@ class ScalableKafkaConsumer:
             self.topic,
             bootstrap_servers=self.bootstrap_servers,
             group_id=self.group_id,
-            auto_offset_reset='latest',  # or 'earliest'
+            auto_offset_reset='earliest',  # or 'earliest'
             enable_auto_commit=True,
             auto_commit_interval_ms=5000,
             value_deserializer=lambda x: json.loads(x.decode('utf-8')),
@@ -80,7 +80,7 @@ if __name__ == "__main__":
     # Configuration
     TOPIC = 'mongo.pages_topic'
     BOOTSTRAP_SERVERS = ['localhost:9092']
-    GROUP_ID = 'wikipedia_consumer_group'
+    GROUP_ID = 'wikipedia_group'  # Consumer group ID
     NUM_WORKERS = 5  # Adjust based on your needs
     
     # Create and start consumer

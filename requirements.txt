@@ -6,4 +6,4 @@ pymongo==4.13.0
 pandas==2.2.3
 kaggle==1.7.4.5
 dotenv==0.9.9
-kafka-python=2.2.10
+kafka-python==2.2.10
