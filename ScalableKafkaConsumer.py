@@ -8,6 +8,7 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 class ScalableKafkaConsumer:
+    
     def __init__(self, topic, bootstrap_servers, group_id, num_workers=4):
         self.topic = topic
         self.bootstrap_servers = bootstrap_servers
@@ -77,10 +78,10 @@ class ScalableKafkaConsumer:
 
 if __name__ == "__main__":
     # Configuration
-    TOPIC = 'your_topic_name'
-    BOOTSTRAP_SERVERS = ['kafka-broker1:9092', 'kafka-broker2:9092']
-    GROUP_ID = 'your_consumer_group'
-    NUM_WORKERS = 8  # Adjust based on your needs
+    TOPIC = 'mongo.pages_topic'
+    BOOTSTRAP_SERVERS = ['localhost:9092']
+    GROUP_ID = 'wikipedia_consumer_group'
+    NUM_WORKERS = 5  # Adjust based on your needs
     
     # Create and start consumer
     consumer = ScalableKafkaConsumer(
