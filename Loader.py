@@ -4,8 +4,7 @@ from pymongo import MongoClient
 from pymongo.errors import BulkWriteError
 from tqdm import tqdm
 
-def load_jsonl_files_to_mongodb(data_directory, db, collection, mongodb_uri, 
-                              batch_size, username, password, auth_source):
+def load_jsonl_files_to_mongodb(data_directory, db, collection):
     """
     Load all .jsonl files from a directory into MongoDB collection
     
@@ -13,19 +12,9 @@ def load_jsonl_files_to_mongodb(data_directory, db, collection, mongodb_uri,
         data_directory: Path to directory containing .jsonl files
         db: MongoDB database name
         collection: MongoDB collection name
-        mongodb_uri: MongoDB connection URI
-        batch_size: Number of documents to insert at once
-        username: MongoDB username
-        password: MongoDB password
-        auth_source: Authentication database
     """
-    # Connect to MongoDB
-    client = MongoClient(
-        mongodb_uri,
-        username=username,
-        password=password,
-        authSource=auth_source # Adjust if not using replica set
-    )
+
+    client = MongoClient("mongodb://root:rootpassword@localhost:27017/?replicaSet=rs0&authSource=admin&directConnection=true")
     db = client[db]
     collection = db[collection]
     
@@ -85,7 +74,7 @@ def main():
     DB_NAME = "wikipedia"                       # MongoDB database name
     COLLECTION_NAME = "pages"                   # MongoDB collection name
     # MongoDB connection URI
-    MONGODB_URI = "mongodb://localhost:27017/?replicaSet=rs0"  
+    MONGODB_URI = "mongodb://localhost:27017"  
     BATCH_SIZE = 100000                         # Number of documents to insert at once
     USERNAME = "root"                           # MongoDB username (None if no auth)
     PASSWORD = "rootpassword"                   # MongoDB password (None if no auth)
@@ -95,12 +84,7 @@ def main():
     load_jsonl_files_to_mongodb(
         data_directory=DATA_DIRECTORY,
         db=DB_NAME,
-        collection=COLLECTION_NAME,
-        mongodb_uri=MONGODB_URI,
-        batch_size=BATCH_SIZE,
-        username=USERNAME,
-        password=PASSWORD,
-        auth_source=AUTH_SOURCE
+        collection=COLLECTION_NAME
     )
 
 if __name__ == "__main__":
