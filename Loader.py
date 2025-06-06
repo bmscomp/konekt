@@ -50,7 +50,7 @@ def load_jsonl_files_to_mongodb(data_directory, db, collection):
                     batch.append(doc)
                     
                     # Insert when batch reaches batch_size
-                    if len(batch) >= batch_size:
+                    if len(batch) >= 100000:
                         result = collection.insert_many(batch)
                         inserted_count += len(result.inserted_ids)
                         batch = []
@@ -73,12 +73,6 @@ def main():
     DATA_DIRECTORY = "./data"                   # Directory containing your .jsonl files
     DB_NAME = "wikipedia"                       # MongoDB database name
     COLLECTION_NAME = "pages"                   # MongoDB collection name
-    # MongoDB connection URI
-    MONGODB_URI = "mongodb://localhost:27017"  
-    BATCH_SIZE = 100000                         # Number of documents to insert at once
-    USERNAME = "root"                           # MongoDB username (None if no auth)
-    PASSWORD = "rootpassword"                   # MongoDB password (None if no auth)
-    AUTH_SOURCE = "admin"                       # Authentication database
     
     # Run the import
     load_jsonl_files_to_mongodb(
