@@ -73,7 +73,7 @@ def main():
     DATA_DIRECTORY = "./data"                   # Directory containing your .jsonl files
     DB_NAME = "wikipedia"                       # MongoDB database name
     COLLECTION_NAME = "pages"                   # MongoDB collection name
-    
+ 
     # Run the import
     load_jsonl_files_to_mongodb(
         data_directory=DATA_DIRECTORY,
