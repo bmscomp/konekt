@@ -212,7 +212,7 @@ services:
         
         # Create MongoDB source connector
         echo "Creating MongoDB Source Connector..."
-        curl -X POST -H "Content-Type: application/json" --data @/tmp/mongo-source-connector.json http://connect:8083/connectors
+        #curl -X POST -H "Content-Type: application/json" --data @/tmp/mongo-source-connector.json http://connect:8083/connectors
         
         # Keep container running
         sleep infinity
