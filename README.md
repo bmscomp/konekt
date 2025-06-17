@@ -185,7 +185,7 @@ You can customize the consumer behavior by modifying the following parameters in
 - Modify the MongoDB initialization script to create additional collections
 - Add new data sources to the Seeder.py script
 
-## Some implementation 
+## Create a connector from curl command
 
 curl -X POST -H "Content-Type: application/json" --data @mongo-source-connector.json http://localhost:8083/connectors
 

@@ -994,7 +994,7 @@ def run_confluent_consumer_example():
     config = ConsumerConfig(
         bootstrap_servers="localhost:9092",
         group_id="confluent-consumer-group",
-        topics=["test-topic"],
+        topics=["mongo.pages_topic"],
         max_workers=4,
         batch_size=10
     )

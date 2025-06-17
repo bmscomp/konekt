@@ -648,6 +648,23 @@ def run_confluent_consumer_example():
         logger.error("Confluent Kafka not available")
         return
     
+    # First check if Kafka is accessible
+    try:
+        admin_client = AdminClient({'bootstrap.servers': 'localhost:9092'})
+        topics = admin_client.list_topics(timeout=5)
+        if not topics:
+            logger.error("Failed to connect to Kafka broker")
+            return
+        
+        # Check if test-topic exists
+        if 'test-topic' not in topics.topics:
+            logger.error("test-topic does not exist")
+            return
+            
+    except KafkaException as e:
+        logger.error(f"Failed to connect to Kafka: {e}")
+        return
+    
     config = ConsumerConfig(
         bootstrap_servers="localhost:9092",
         group_id="confluent-consumer-group",
@@ -656,24 +673,41 @@ def run_confluent_consumer_example():
         batch_size=10
     )
     
-    consumer = ConfluentKafkaConsumer(config, sample_message_handler)
+    try:
+        consumer = ConfluentKafkaConsumer(config, sample_message_handler)
+    except Exception as e:
+        logger.error(f"Failed to create consumer: {e}")
+        return
     
-    # Start stats reporting thread
-    def report_stats():
-        while consumer.running:
-            time.sleep(30)
-            stats = consumer.get_stats()
-            logger.info(f"Consumer stats: {stats}")
-    
-    stats_thread = threading.Thread(target=report_stats, daemon=True)
-    stats_thread.start()
+    stats_thread = None
     
     try:
+        # Start stats reporting thread
+        def report_stats():
+            while consumer.running:
+                try:
+                    time.sleep(30)
+                    stats = consumer.get_stats()
+                    logger.info(f"Consumer stats: {stats}")
+                except Exception as e:
+                    logger.error(f"Error in stats reporting: {e}")
+                    break
+        
+        stats_thread = threading.Thread(target=report_stats, daemon=True)
+        stats_thread.start()
+        
+        # Start the consumer
         consumer.start()
+        
     except KeyboardInterrupt:
         logger.info("Received interrupt signal")
+    except Exception as e:
+        logger.error(f"Error running consumer: {e}")
     finally:
         consumer.shutdown()
+        if stats_thread and stats_thread.is_alive():
+            consumer.running = False
+            stats_thread.join(timeout=5)
 
 def run_kafka_python_consumer_example():
     """Example of running the Kafka Python consumer"""
@@ -684,7 +718,7 @@ def run_kafka_python_consumer_example():
     config = ConsumerConfig(
         bootstrap_servers="localhost:9092",
         group_id="kafka-python-consumer-group",
-        topics=["test-topic"],
+        topics=["mongo.pages_topic"],
         max_workers=4,
         batch_size=10
     )
@@ -721,3 +755,4 @@ if __name__ == "__main__":
         print("- confluent: Uses confluent-kafka library")
         print("- kafka-python: Uses kafka-python library")
         print("\nUsage: python script.py [confluent|kafka-python]")
+        
