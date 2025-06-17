@@ -14,8 +14,8 @@ confluent-kafka>=2.3.0
 kafka-python>=2.0.2
 
 # Core dependencies for threading and async operations
-threading-utils>=0.3
-concurrent-futures>=3.1.1
+#threading-utils>=0.3
+#concurrent-futures>=3.1.1
 
 # Logging and monitoring
 structlog>=23.2.0
@@ -27,7 +27,7 @@ python-dotenv>=1.0.0
 
 # Data serialization
 msgpack>=1.0.7
-avro-python3>=1.11.3
+#avro-python3>=1.11.3
 fastavro>=1.9.4
 
 # Metrics and monitoring (optional but recommended)
