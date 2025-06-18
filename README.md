@@ -918,3 +918,137 @@ db_config = DatabaseConfig(
    - Monitor disk space
    - Review error logs
    - Update configurations as needed
+
+## script_db_sqlserver.py Implementation
+
+`script_db_sqlserver.py` is a SQL Server-specific implementation of the Kafka consumer that provides robust message consumption and storage capabilities with Microsoft SQL Server as the backend database.
+
+### Key Features
+
+1. **SQL Server Integration**
+   - Full SQL Server support using pyodbc driver
+   - Optimized connection pooling for SQL Server
+   - SQL Server-specific schema and data types
+   - Proper index creation for performance
+
+2. **Dual Kafka Client Support**
+   - Compatible with both confluent-kafka and kafka-python libraries
+   - Consistent interface across both client implementations
+   - Client-specific configuration handling
+
+3. **Transactional Message Processing**
+   - ACID-compliant database operations
+   - Proper transaction management with commit/rollback
+   - Offset commits synchronized with database transactions
+   - Bulk insert operations for efficiency
+
+4. **Resilient Architecture**
+   - Configurable retry mechanism
+   - Error handling with proper logging
+   - Connection error recovery
+   - Graceful shutdown handling
+
+### Usage
+
+```bash
+# Run with confluent-kafka implementation
+python script_db_sqlserver.py confluent
+
+# Run with kafka-python implementation
+python script_db_sqlserver.py kafka-python
+```
+
+### Configuration
+
+```python
+# SQL Server configuration
+db_config = DatabaseConfig(
+    server=os.getenv("SQLSERVER_HOST", "localhost"),
+    port=int(os.getenv("SQLSERVER_PORT", "1433")),
+    database=os.getenv("SQLSERVER_DB", "kafka_messages"),
+    username=os.getenv("SQLSERVER_USER", "sa"),
+    password=os.getenv("SQLSERVER_PASSWORD", "Seeqwa1!Passw0rd"),
+    driver=os.getenv("SQLSERVER_DRIVER", "ODBC Driver 18 for SQL Server"),
+    table_name="processed_messages",
+    create_table_if_not_exists=True,
+    trust_server_certificate=True,
+    encrypt=True,
+    connection_timeout=30
+)
+
+# Consumer configuration
+consumer_config = ConsumerConfig(
+    bootstrap_servers=os.getenv("KAFKA_BOOTSTRAP_SERVERS", "localhost:9092"),
+    group_id="sqlserver-consumer-group",
+    topics=["test-topic"],
+    auto_offset_reset="earliest",
+    enable_auto_commit=False,
+    max_poll_records=500,
+    session_timeout_ms=30000,
+    heartbeat_interval_ms=10000,
+    max_poll_interval_ms=300000,
+    max_workers=4,
+    batch_size=100,
+    database_config=db_config,
+    enable_database_storage=True
+)
+```
+
+### Database Schema
+
+The script automatically creates the following SQL Server table structure:
+
+```sql
+CREATE TABLE processed_messages (
+    id VARCHAR(36) PRIMARY KEY,
+    topic VARCHAR(255) NOT NULL,
+    partition INT NOT NULL,
+    offset INT NOT NULL,
+    message_key VARCHAR(255),
+    message_value TEXT NOT NULL,
+    message_headers TEXT,
+    consumer_group VARCHAR(255) NOT NULL,
+    processing_time FLOAT,
+    processing_status VARCHAR(50) NOT NULL,
+    error_message TEXT,
+    created_at DATETIME NOT NULL,
+    updated_at DATETIME NOT NULL
+);
+
+-- Indexes for better performance
+CREATE INDEX idx_processed_messages_topic_partition_offset ON processed_messages (topic, partition, offset);
+CREATE INDEX idx_processed_messages_status ON processed_messages (processing_status);
+CREATE INDEX idx_processed_messages_created_at ON processed_messages (created_at);
+```
+
+### Environment Variables
+
+| Variable | Description | Default |
+|----------|-------------|--------|
+| `SQLSERVER_HOST` | SQL Server hostname | localhost |
+| `SQLSERVER_PORT` | SQL Server port | 1433 |
+| `SQLSERVER_DB` | Database name | kafka_messages |
+| `SQLSERVER_USER` | Database username | sa |
+| `SQLSERVER_PASSWORD` | Database password | Seeqwa1!Passw0rd |
+| `SQLSERVER_DRIVER` | ODBC driver name | ODBC Driver 18 for SQL Server |
+| `KAFKA_BOOTSTRAP_SERVERS` | Kafka broker addresses | localhost:9092 |
+
+### Best Practices
+
+1. **SQL Server Configuration**
+   - Use connection pooling for better performance
+   - Set appropriate connection timeouts
+   - Configure proper authentication
+   - Use parameterized queries for security
+
+2. **Performance Optimization**
+   - Use bulk inserts for better throughput
+   - Create appropriate indexes for your query patterns
+   - Monitor SQL Server query performance
+   - Consider table partitioning for large datasets
+
+3. **Maintenance**
+   - Implement regular data cleanup
+   - Monitor SQL Server logs
+   - Check for database growth
+   - Maintain index statistics
