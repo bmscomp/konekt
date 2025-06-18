@@ -795,3 +795,126 @@ class TimedMessageHandler:
 ```
 
 This comprehensive implementation provides production-ready Kafka consumers with partition awareness, resilience, and multi-threading capabilities suitable for high-throughput, mission-critical applications.
+
+## script_db.py Implementation
+
+`script_db.py` is a robust Kafka consumer implementation that supports both confluent-kafka and kafka-python libraries with SQLite database integration. It provides reliable message consumption and storage with proper transactional integrity.
+
+### Key Features
+
+1. **Dual Kafka Client Support**
+   - Compatible with both confluent-kafka and kafka-python libraries
+   - Seamless switching between implementations
+   - Consistent interface across both clients
+
+2. **SQLite Database Integration**
+   - Transactional message storage
+   - Automatic table creation
+   - Efficient batch processing
+   - Thread-safe database operations
+
+3. **Resilient Message Processing**
+   - Configurable retry mechanism
+   - Error handling with proper logging
+   - At-least-once delivery guarantee
+   - Proper offset management
+
+4. **Multi-threaded Architecture**
+   - Per-partition worker threads
+   - Thread-safe message queues
+   - Controlled concurrency
+   - Graceful shutdown handling
+
+### Usage
+
+```bash
+# Run with kafka-python implementation
+python script_db.py kafka-python
+
+# Run with confluent-kafka implementation
+python script_db.py confluent
+```
+
+### Configuration
+
+```python
+# Consumer configuration
+config = ConsumerConfig(
+    bootstrap_servers="localhost:9092",
+    group_id="my-group",
+    topics=["test-topic"],
+    auto_offset_reset="earliest",
+    enable_auto_commit=False,
+    max_poll_records=500,
+    session_timeout_ms=30000,
+    heartbeat_interval_ms=10000,
+    max_poll_interval_ms=300000,
+    retry_count=3,
+    retry_interval=1.0
+)
+
+# Database configuration
+db_config = DatabaseConfig(
+    database="kafka_messages.db",
+    table_name="processed_messages",
+    create_table_if_not_exists=True
+)
+```
+
+### Message Processing Flow
+
+1. **Message Consumption**
+   - Consumer polls messages from Kafka
+   - Messages are validated and decoded
+   - Metadata is extracted (topic, partition, offset)
+
+2. **Processing**
+   - Messages are processed by worker threads
+   - Each partition has a dedicated worker
+   - Retry logic handles transient failures
+
+3. **Database Storage**
+   - Messages are stored in SQLite database
+   - Transactions ensure data consistency
+   - Offsets are committed after successful storage
+
+4. **Monitoring**
+   - Processing statistics are collected
+   - Worker thread health is monitored
+   - Error conditions are logged
+
+### Error Handling
+
+1. **Kafka Errors**
+   - Connection issues
+   - Partition rebalancing
+   - Message deserialization
+
+2. **Processing Errors**
+   - Invalid message format
+   - Business logic failures
+   - Resource constraints
+
+3. **Database Errors**
+   - Connection issues
+   - Transaction failures
+   - Schema violations
+
+### Best Practices
+
+1. **Configuration**
+   - Adjust batch sizes based on message size and processing time
+   - Set appropriate timeout values for your use case
+   - Configure retry parameters based on error patterns
+
+2. **Monitoring**
+   - Watch for consumer lag
+   - Monitor processing times
+   - Track error rates
+   - Check database performance
+
+3. **Maintenance**
+   - Regularly clean up old data
+   - Monitor disk space
+   - Review error logs
+   - Update configurations as needed

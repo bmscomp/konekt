@@ -91,11 +91,10 @@ class ConsumerConfig:
             'bootstrap.servers': self.bootstrap_servers,
             'group.id': self.group_id,
             'auto.offset.reset': self.auto_offset_reset,
-            'enable.auto.commit': self.enable_auto_commit,
-            'max.poll.records': self.max_poll_records,
-            'session.timeout.ms': self.session_timeout_ms,
-            'heartbeat.interval.ms': self.heartbeat_interval_ms,
-            'max.poll.interval.ms': self.max_poll_interval_ms
+            'enable.auto.commit': str(self.enable_auto_commit).lower(),
+            'session.timeout.ms': str(self.session_timeout_ms),
+            'heartbeat.interval.ms': str(self.heartbeat_interval_ms),
+            'max.poll.interval.ms': str(self.max_poll_interval_ms)
         }
 
 @dataclass
@@ -625,68 +624,39 @@ class ConfluentKafkaConsumer(BaseKafkaConsumer):
         
         try:
             self.consumer = self._create_consumer()
-            self.admin_client = AdminClient(self.config.to_confluent_config())
+            self.admin_client = AdminClient({'bootstrap.servers': self.config.bootstrap_servers})
             
-            # Main consumption loop
-            batch_messages = {}
-            batch_offsets = {}
-            batch_keys = {}
-            batch_headers = {}
-            
-            while self.running and not self.shutdown_event.is_set():
+            # Main consumer loop
+            while self.running:
                 try:
-                    msg = self.consumer.poll(timeout=1.0)
-                    
-                    if msg is None:
-                        # Process any pending batches
-                        self._flush_batches(batch_messages, batch_offsets, batch_keys, batch_headers)
+                    message = self.consumer.poll(timeout=1.0)
+                    if message is None:
                         continue
                     
-                    if msg.error():
-                        if msg.error().code() == KafkaError._PARTITION_EOF:
-                            logger.debug(f"Reached end of partition {msg.partition()}")
+                    if message.error():
+                        if message.error().code() == KafkaError._PARTITION_EOF:
+                            logger.debug(f"Reached end of partition {message.partition()}")
+                            continue
                         else:
-                            logger.error(f"Consumer error: {msg.error()}")
-                        continue
+                            logger.error(f"Consumer error: {message.error()}")
+                            continue
                     
-                    # Add message to batch
-                    partition = msg.partition()
-                    if partition not in batch_messages:
-                        batch_messages[partition] = []
-                        batch_offsets[partition] = []
-                        batch_keys[partition] = []
-                        batch_headers[partition] = []
+                    # Process message
+                    metadata = {
+                        'topic': message.topic(),
+                        'partition': message.partition(),
+                        'offset': message.offset(),
+                        'key': message.key(),
+                        'headers': dict(message.headers()) if message.headers() else None
+                    }
                     
-                    batch_messages[partition].append(msg.value())
-                    batch_offsets[partition].append(msg.offset())
-                    batch_keys[partition].append(msg.key().decode('utf-8') if msg.key() else None)
-                    batch_headers[partition].append(dict(msg.headers()) if msg.headers() else None)
+                    self.process_message_with_retry(message.value(), metadata)
                     
-                    # Send batch when it reaches the configured size
-                    if len(batch_messages[partition]) >= self.config.batch_size:
-                        self._send_batch_to_worker(
-                            partition, msg.topic(), 
-                            batch_messages[partition], 
-                            batch_offsets[partition],
-                            batch_keys[partition],
-                            batch_headers[partition]
-                        )
-                        batch_messages[partition] = []
-                        batch_offsets[partition] = []
-                        batch_keys[partition] = []
-                        batch_headers[partition] = []
-                        batch_offsets[partition] = []
-                
                 except KafkaException as e:
-                    logger.error(f"Kafka exception: {e}")
-                    time.sleep(1)
+                    logger.error(f"Kafka error: {e}")
                 except Exception as e:
                     logger.error(f"Unexpected error: {e}")
-                    time.sleep(1)
-            
-            # Process final batches
-            self._flush_batches(batch_messages, batch_offsets)
-            
+                    
         except Exception as e:
             logger.error(f"Fatal error in consumer: {e}")
         finally:
@@ -1001,7 +971,7 @@ def run_confluent_consumer_example():
     consumer_config = ConsumerConfig(
         bootstrap_servers="localhost:9092",
         group_id="confluent-consumer-group",
-        topics=["test-topic"],
+        topics=["mongo.pages_topic"],
         max_workers=4,
         batch_size=100,
         database_config=db_config,
@@ -1077,7 +1047,7 @@ def run_kafka_python_consumer_example():
     consumer_config = ConsumerConfig(
         bootstrap_servers="localhost:9092",
         group_id="kafka-python-consumer-group",
-        topics=["test-topic"],
+        topics=["mongo.pages_topic"],
         max_workers=4,
         batch_size=100,
         database_config=db_config,
