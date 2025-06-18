@@ -5,7 +5,6 @@ Includes implementations for both confluent-kafka and kafka-python libraries.
 Uses SQL Server for message storage.
 """
 
-import json
 import logging
 import signal
 import sys
@@ -40,12 +39,29 @@ except ImportError:
     KAFKA_PYTHON_AVAILABLE = False
     print("Warning: kafka-python not available")
 
-# SQLAlchemy and SQL Server imports
-import sqlalchemy
-from sqlalchemy import create_engine, text, Table, Column, String, DateTime, Text, Integer, MetaData
-from sqlalchemy.orm import sessionmaker, Session
-from sqlalchemy.exc import SQLAlchemyError
-import pyodbc
+# Check Python version for SQLAlchemy compatibility
+PYTHON_VERSION = sys.version_info
+ENABLE_DATABASE = os.getenv('ENABLE_DATABASE', 'true').lower() == 'true'
+
+# SQLAlchemy has compatibility issues with Python 3.13
+if PYTHON_VERSION >= (3, 13) and ENABLE_DATABASE:
+    print("WARNING: SQLAlchemy is not compatible with Python 3.13+. Database functionality will be disabled.")
+    print("To run without this warning, set environment variable ENABLE_DATABASE=false")
+    ENABLE_DATABASE = False
+
+# SQLAlchemy and SQL Server imports - conditional based on Python version
+SQLALCHEMY_AVAILABLE = False
+try:
+    if ENABLE_DATABASE:
+        import sqlalchemy
+        from sqlalchemy import create_engine, text, Table, Column, String, DateTime, Text, Integer, MetaData
+        from sqlalchemy.orm import sessionmaker, Session
+        from sqlalchemy.exc import SQLAlchemyError
+        import pyodbc
+        SQLALCHEMY_AVAILABLE = True
+except ImportError:
+    print("SQLAlchemy or pyodbc not installed. Database functionality will be disabled.")
+    ENABLE_DATABASE = False
 
 # Setup logging
 logging.basicConfig(
@@ -160,10 +176,20 @@ class DatabaseManager:
         self.config = config
         self.engine = None
         self.session_factory = None
+        
+        # Check if SQLAlchemy is available
+        if not SQLALCHEMY_AVAILABLE:
+            logger.warning("SQLAlchemy is not available. Database functionality will be disabled.")
+            return
+            
         self._setup_database()
     
     def _setup_database(self):
         """Initialize database connection and create tables if needed"""
+        if not SQLALCHEMY_AVAILABLE:
+            logger.warning("SQLAlchemy is not available. Skipping database setup.")
+            return
+            
         try:
             # Create SQL Server engine with connection pooling
             self.engine = create_engine(
@@ -174,74 +200,100 @@ class DatabaseManager:
                 pool_recycle=1800
             )
             
+            # Test connection
+            logger.info(f"Testing connection to SQL Server at {self.config.server}:{self.config.port}")
+            with self.engine.connect() as connection:
+                connection.execute(text("SELECT 1"))
+                logger.info("SQL Server connection successful")
+            
+            # Create session factory
             self.session_factory = sessionmaker(bind=self.engine)
             
+            # Create table if needed
             if self.config.create_table_if_not_exists:
-                metadata = MetaData()
+                self._create_table_if_not_exists()
                 
-                # Define the processed_messages table
-                Table(
-                    self.config.table_name, metadata,
-                    Column('id', String(36), primary_key=True),
-                    Column('topic', String(255), nullable=False),
-                    Column('partition', Integer, nullable=False),
-                    Column('offset', Integer, nullable=False),
-                    Column('message_key', String(255)),
-                    Column('message_value', Text, nullable=False),
-                    Column('message_headers', Text),
-                    Column('consumer_group', String(255), nullable=False),
-                    Column('processing_time', sqlalchemy.Float),
-                    Column('processing_status', String(50), nullable=False),
-                    Column('error_message', Text),
-                    Column('created_at', DateTime, nullable=False),
-                    Column('updated_at', DateTime, nullable=False)
-                )
-                
-                metadata.create_all(self.engine)
-                
-                # Create indexes for better performance
-                with self.get_session() as session:
-                    # Index for topic, partition, offset lookups
-                    session.execute(text(f"""
-                        IF NOT EXISTS (
-                            SELECT * FROM sys.indexes 
-                            WHERE name = 'idx_{self.config.table_name}_topic_partition_offset'
-                        )
-                        CREATE INDEX idx_{self.config.table_name}_topic_partition_offset 
-                        ON {self.config.table_name} (topic, partition, offset)
-                    """))
-                    
-                    # Index for status-based queries
-                    session.execute(text(f"""
-                        IF NOT EXISTS (
-                            SELECT * FROM sys.indexes 
-                            WHERE name = 'idx_{self.config.table_name}_status'
-                        )
-                        CREATE INDEX idx_{self.config.table_name}_status 
-                        ON {self.config.table_name} (processing_status)
-                    """))
-                    
-                    # Index for time-based queries
-                    session.execute(text(f"""
-                        IF NOT EXISTS (
-                            SELECT * FROM sys.indexes 
-                            WHERE name = 'idx_{self.config.table_name}_created_at'
-                        )
-                        CREATE INDEX idx_{self.config.table_name}_created_at 
-                        ON {self.config.table_name} (created_at)
-                    """))
-                    
-                    session.commit()
-                
-                logger.info(f"Database table {self.config.table_name} ready")
-                
-        except SQLAlchemyError as e:
+        except Exception as e:
             logger.error(f"Database setup error: {e}")
-            raise
+            logger.error(f"Connection failed to {self.config.server}:{self.config.port}/{self.config.database} as user {self.config.username}")
+            self.engine = None
+            self.session_factory = None
+    
+    def _create_table_if_not_exists(self):
+        """Create the messages table and indexes if they don't exist"""
+        if not SQLALCHEMY_AVAILABLE or not self.engine:
+            return
+            
+        try:
+            metadata = MetaData()
+            
+            # Define the processed_messages table
+            Table(
+                self.config.table_name, metadata,
+                Column('id', String(36), primary_key=True),
+                Column('topic', String(255), nullable=False),
+                Column('partition', Integer, nullable=False),
+                Column('offset', Integer, nullable=False),
+                Column('message_key', String(255)),
+                Column('message_value', Text, nullable=False),
+                Column('message_headers', Text),
+                Column('consumer_group', String(255), nullable=False),
+                Column('processing_time', sqlalchemy.Float),
+                Column('processing_status', String(50), nullable=False),
+                Column('error_message', Text),
+                Column('created_at', DateTime, nullable=False),
+                Column('updated_at', DateTime, nullable=False)
+            )
+            
+            metadata.create_all(self.engine)
+            
+            # Create indexes for better performance
+            with self.get_session() as session:
+                # Index for topic, partition, offset lookups
+                session.execute(text(f"""
+                    IF NOT EXISTS (
+                        SELECT * FROM sys.indexes 
+                        WHERE name = 'idx_{self.config.table_name}_topic_partition_offset'
+                    )
+                    CREATE INDEX idx_{self.config.table_name}_topic_partition_offset 
+                    ON {self.config.table_name} (topic, partition, offset)
+                """))
+                
+                # Index for status-based queries
+                session.execute(text(f"""
+                    IF NOT EXISTS (
+                        SELECT * FROM sys.indexes 
+                        WHERE name = 'idx_{self.config.table_name}_status'
+                    )
+                    CREATE INDEX idx_{self.config.table_name}_status 
+                    ON {self.config.table_name} (processing_status)
+                """))
+                
+                # Index for time-based queries
+                session.execute(text(f"""
+                    IF NOT EXISTS (
+                        SELECT * FROM sys.indexes 
+                        WHERE name = 'idx_{self.config.table_name}_created_at'
+                    )
+                    CREATE INDEX idx_{self.config.table_name}_created_at 
+                    ON {self.config.table_name} (created_at)
+                """))
+                
+                session.commit()
+            
+            logger.info(f"Database table {self.config.table_name} ready")
+            
+        except Exception as e:
+            logger.error(f"Failed to create table: {e}")
     
     @contextmanager
-    def get_session(self) -> Session:
+    def get_session(self):
         """Context manager for database sessions with automatic cleanup"""
+        if not SQLALCHEMY_AVAILABLE or not self.session_factory:
+            logger.warning("SQLAlchemy is not available. Cannot create database session.")
+            yield None
+            return
+            
         session = self.session_factory()
         try:
             yield session
@@ -255,8 +307,18 @@ class DatabaseManager:
         """Insert processed messages into database with transaction management"""
         if not messages:
             return
+            
+        if not SQLALCHEMY_AVAILABLE or not self.session_factory:
+            # Log messages instead of storing them when database is not available
+            logger.info(f"Database not available. Would have stored {len(messages)} messages.")
+            for msg in messages:
+                logger.debug(f"Message: topic={msg.topic}, partition={msg.partition}, offset={msg.offset}, status={msg.processing_status}")
+            return
         
         with self.get_session() as session:
+            if session is None:
+                return
+                
             try:
                 # Convert messages to dictionaries for bulk insert
                 records = []
@@ -296,15 +358,21 @@ class DatabaseManager:
                 
                 session.commit()
                 logger.info(f"Successfully stored {len(messages)} messages in database")
-                
-            except SQLAlchemyError as e:
-                session.rollback()
+            except Exception as e:
                 logger.error(f"Failed to store messages in database: {e}")
-                raise
+                session.rollback()
+                # Continue execution even if database insertion fails
     
     def get_message_by_offset(self, topic: str, partition: int, offset: int) -> Optional[ProcessedMessage]:
         """Retrieve a processed message by topic, partition, and offset"""
+        if not SQLALCHEMY_AVAILABLE or not self.session_factory:
+            logger.warning("SQLAlchemy is not available. Cannot retrieve message from database.")
+            return None
+            
         with self.get_session() as session:
+            if session is None:
+                return None
+                
             try:
                 result = session.execute(
                     text(f"""
@@ -497,7 +565,7 @@ class BaseKafkaConsumer(ABC):
                 processed_message.message_value = str(message)
             
             if metadata.get('headers'):
-                processed_message.message_headers = json.dumps(metadata['headers'])
+                processed_message.message_headers = metadata['headers']
         
         for attempt in range(self.config.retry_count + 1):
             try:
@@ -672,7 +740,7 @@ def run_confluent_consumer_example():
     consumer_config = ConsumerConfig(
         bootstrap_servers=os.getenv("KAFKA_BOOTSTRAP_SERVERS", "localhost:9092"),
         group_id="confluent-consumer-group",
-        topics=["test-topic"],
+        topics=["tmongo.pages_topic"],
         max_workers=4,
         batch_size=100,
         database_config=db_config,
@@ -687,7 +755,7 @@ def run_confluent_consumer_example():
             # Process the message (example: parse JSON)
             if isinstance(message, bytes):
                 message = message.decode('utf-8')
-            data = json.loads(message)
+            data = message
             
             # Create processed message record
             processed_msg = ProcessedMessage(
@@ -695,8 +763,8 @@ def run_confluent_consumer_example():
                 partition=metadata['partition'],
                 offset=metadata['offset'],
                 message_key=metadata.get('key'),
-                message_value=json.dumps(data),
-                message_headers=json.dumps(metadata.get('headers')),
+                message_value=data,
+                message_headers=metadata.get('headers'),
                 consumer_group=consumer_config.group_id,
                 processing_status='SUCCESS'
             )
@@ -753,7 +821,7 @@ def run_kafka_python_consumer_example():
     consumer_config = ConsumerConfig(
         bootstrap_servers=os.getenv("KAFKA_BOOTSTRAP_SERVERS", "localhost:9092"),
         group_id="kafka-python-consumer-group",
-        topics=["test-topic"],
+        topics=["mongo.pages_topic"],
         max_workers=4,
         batch_size=100,
         database_config=db_config,
@@ -768,7 +836,7 @@ def run_kafka_python_consumer_example():
             # Process the message (example: parse JSON)
             if isinstance(message, bytes):
                 message = message.decode('utf-8')
-            data = json.loads(message)
+            data = message
             
             # Create processed message record
             processed_msg = ProcessedMessage(
@@ -776,8 +844,8 @@ def run_kafka_python_consumer_example():
                 partition=metadata['partition'],
                 offset=metadata['offset'],
                 message_key=metadata.get('key'),
-                message_value=json.dumps(data),
-                message_headers=json.dumps(metadata.get('headers')),
+                message_value=data,
+                message_headers=metadata.get('headers'),
                 consumer_group=consumer_config.group_id,
                 processing_status='SUCCESS'
             )

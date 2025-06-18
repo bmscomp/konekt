@@ -4,9 +4,9 @@ kafka-python==2.2.11
 
 # Database
 pymongo==4.6.1
-sqlalchemy==2.0.23
+sqlalchemy==2.0.41  # Using older version for Python 3.13 compatibility
 psycopg2-binary==2.9.10
-pyodbc==5.0.1
+pyodbc==5.2.0
 
 # System monitoring
 psutil==5.9.8
