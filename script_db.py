@@ -11,7 +11,7 @@ import sys
 import threading
 import time
 from abc import ABC, abstractmethod
-from concurrent.futures import ThreadPoolExecutor, as_completed
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, field
 from queue import Queue, Empty
 from typing import Dict, List, Optional, Callable, Any
@@ -38,17 +38,11 @@ except ImportError:
     KAFKA_PYTHON_AVAILABLE = False
     print("Warning: kafka-python not available")
 
-# MS SQL Server imports
-try:
-    import pyodbc
-    import sqlalchemy
-    from sqlalchemy import create_engine, text, Table, Column, String, DateTime, Text, Integer, MetaData
-    from sqlalchemy.orm import sessionmaker, Session
-    from sqlalchemy.exc import SQLAlchemyError
-    MSSQL_AVAILABLE = True
-except ImportError:
-    MSSQL_AVAILABLE = False
-    print("Warning: MS SQL Server dependencies not available")
+# SQLAlchemy imports
+import sqlalchemy
+from sqlalchemy import create_engine, text, Table, Column, String, DateTime, Text, Integer, MetaData
+from sqlalchemy.orm import sessionmaker, Session
+from sqlalchemy.exc import SQLAlchemyError
 
 # Setup logging
 logging.basicConfig(
@@ -171,12 +165,9 @@ class MessageBatch:
     headers: List[Optional[Dict]] = field(default_factory=list)
 
 class DatabaseManager:
-    """Manages MS SQL Server database operations with transaction support"""
+    """Manages SQLite database operations with transaction support"""
     
     def __init__(self, config: DatabaseConfig):
-        if not MSSQL_AVAILABLE:
-            raise ImportError("MS SQL Server dependencies not available")
-        
         self.config = config
         self.engine = None
         self.session_factory = None
@@ -675,7 +666,7 @@ class ConfluentKafkaConsumer(BaseKafkaConsumer):
                         batch_messages[partition] = []
                         batch_offsets[partition] = []
                         batch_keys[partition] = []
-                        batch_headers[partition] = []_messages[partition] = []
+                        batch_headers[partition] = []
                         batch_offsets[partition] = []
                 
                 except KafkaException as e:
