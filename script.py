@@ -4,7 +4,6 @@ Partition-aware and resilient Kafka consumers with multi-threading support.
 Includes implementations for both confluent-kafka and kafka-python libraries.
 """
 
-import json
 import logging
 import signal
 import sys
@@ -632,7 +631,7 @@ def sample_message_handler(message: Any) -> bool:
         
         # Example: Process JSON messages
         if isinstance(message, str):
-            data = json.loads(message)
+            data = message
             logger.info(f"Processed message: {data.get('id', 'unknown')}")
         else:
             logger.info(f"Processed message: {message}")
