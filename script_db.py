@@ -52,41 +52,62 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 @dataclass
-class DatabaseConfig:
-    """Configuration for MS SQL Server database"""
-    server: str = "localhost"
-    database: str = "kafka_messages"
-    username: Optional[str] = None
-    password: Optional[str] = None
-    driver: str = "ODBC Driver 17 for SQL Server"
-    trusted_connection: bool = True
-    connection_timeout: int = 30
-    command_timeout: int = 30
-    pool_size: int = 10
-    max_overflow: int = 20
-    pool_timeout: int = 30
-    pool_recycle: int = 3600
+class ConsumerConfig:
+    """Configuration for Kafka consumer"""
+    bootstrap_servers: str = "localhost:9092"
+    group_id: str = "kafka_consumer"
+    topics: List[str] = field(default_factory=list)
+    auto_offset_reset: str = "earliest"
+    enable_auto_commit: bool = False
+    max_poll_records: int = 500
+    session_timeout_ms: int = 30000
+    heartbeat_interval_ms: int = 10000
+    max_poll_interval_ms: int = 300000
+    max_workers: int = 4
+    batch_size: int = 100
+    batch_timeout: int = 5
+    retry_count: int = 3
+    retry_interval: int = 1
+    database_config: Optional['DatabaseConfig'] = None
+    enable_database_storage: bool = True
     
-    # Table configuration
+    def to_kafka_python_config(self) -> Dict[str, Any]:
+        """Convert to kafka-python configuration"""
+        return {
+            'bootstrap_servers': self.bootstrap_servers,
+            'group_id': self.group_id,
+            'auto_offset_reset': self.auto_offset_reset,
+            'enable_auto_commit': self.enable_auto_commit,
+            'max_poll_records': self.max_poll_records,
+            'session_timeout_ms': self.session_timeout_ms,
+            'heartbeat_interval_ms': self.heartbeat_interval_ms,
+            'max_poll_interval_ms': self.max_poll_interval_ms,
+            'consumer_timeout_ms': self.batch_timeout * 1000
+        }
+    
+    def to_confluent_config(self) -> Dict[str, Any]:
+        """Convert to confluent-kafka configuration"""
+        return {
+            'bootstrap.servers': self.bootstrap_servers,
+            'group.id': self.group_id,
+            'auto.offset.reset': self.auto_offset_reset,
+            'enable.auto.commit': self.enable_auto_commit,
+            'max.poll.records': self.max_poll_records,
+            'session.timeout.ms': self.session_timeout_ms,
+            'heartbeat.interval.ms': self.heartbeat_interval_ms,
+            'max.poll.interval.ms': self.max_poll_interval_ms
+        }
+
+@dataclass
+class DatabaseConfig:
+    """Configuration for SQLite database"""
+    database: str = "kafka_messages.db"
     table_name: str = "processed_messages"
-    schema: str = "dbo"
     create_table_if_not_exists: bool = True
     
     def get_connection_string(self) -> str:
         """Generate SQLAlchemy connection string"""
-        if self.trusted_connection:
-            return (
-                f"mssql+pyodbc://@{self.server}/{self.database}"
-                f"?driver={self.driver.replace(' ', '+')}"
-                f"&trusted_connection=yes"
-                f"&timeout={self.connection_timeout}"
-            )
-        else:
-            return (
-                f"mssql+pyodbc://{self.username}:{self.password}@{self.server}/{self.database}"
-                f"?driver={self.driver.replace(' ', '+')}"
-                f"&timeout={self.connection_timeout}"
-            )
+        return f"sqlite:///{self.database}"
 
 @dataclass
 class ProcessedMessage:
@@ -172,19 +193,15 @@ class DatabaseManager:
         self.engine = None
         self.session_factory = None
         self.metadata = MetaData()
-        self.processed_messages_table = None
+        self.message_table = None
         self._setup_database()
     
     def _setup_database(self):
         """Initialize database connection and create tables if needed"""
         try:
-            # Create engine with connection pooling
+            # Create engine
             self.engine = create_engine(
                 self.config.get_connection_string(),
-                pool_size=self.config.pool_size,
-                max_overflow=self.config.max_overflow,
-                pool_timeout=self.config.pool_timeout,
-                pool_recycle=self.config.pool_recycle,
                 echo=False  # Set to True for SQL debugging
             )
             
@@ -192,28 +209,27 @@ class DatabaseManager:
             self.session_factory = sessionmaker(bind=self.engine)
             
             # Define table schema
-            self.processed_messages_table = Table(
+            self.message_table = Table(
                 self.config.table_name,
                 self.metadata,
                 Column('id', String(36), primary_key=True),
                 Column('topic', String(255), nullable=False),
                 Column('partition', Integer, nullable=False),
                 Column('offset', Integer, nullable=False),
-                Column('message_key', String(500), nullable=True),
+                Column('message_key', String(255)),
                 Column('message_value', Text, nullable=False),
-                Column('message_headers', Text, nullable=True),
-                Column('processed_at', DateTime, nullable=False),
-                Column('consumer_group', String(255), nullable=False),
-                Column('processing_status', String(50), nullable=False),
-                Column('error_message', Text, nullable=True),
-                Column('retry_count', Integer, default=0),
-                schema=self.config.schema
+                Column('message_headers', Text),
+                Column('processed_at', DateTime, default=datetime.utcnow),
+                Column('consumer_group', String(255)),
+                Column('processing_status', String(50)),
+                Column('error_message', Text),
+                Column('retry_count', Integer, default=0)
             )
             
             # Create table if it doesn't exist
             if self.config.create_table_if_not_exists:
                 self.metadata.create_all(self.engine)
-                logger.info(f"Database table {self.config.schema}.{self.config.table_name} ready")
+                logger.info(f"Database table {self.config.table_name} ready")
             
         except Exception as e:
             logger.error(f"Failed to setup database: {e}")
@@ -234,41 +250,35 @@ class DatabaseManager:
     
     def insert_processed_messages(self, messages: List[ProcessedMessage]) -> bool:
         """Insert processed messages into database with transaction management"""
-        if not messages:
-            return True
-        
         try:
             with self.get_session() as session:
-                # Prepare data for bulk insert
-                message_data = []
+                # Insert all messages in a single transaction
                 for msg in messages:
-                    message_data.append({
-                        'id': msg.id,
-                        'topic': msg.topic,
-                        'partition': msg.partition,
-                        'offset': msg.offset,
-                        'message_key': msg.message_key,
-                        'message_value': msg.message_value,
-                        'message_headers': msg.message_headers,
-                        'processed_at': msg.processed_at,
-                        'consumer_group': msg.consumer_group,
-                        'processing_status': msg.processing_status,
-                        'error_message': msg.error_message,
-                        'retry_count': msg.retry_count
-                    })
-                
-                # Bulk insert using SQLAlchemy Core for better performance
-                session.execute(self.processed_messages_table.insert(), message_data)
+                    session.execute(
+                        self.message_table.insert(),
+                        {
+                            'id': msg.id,
+                            'topic': msg.topic,
+                            'partition': msg.partition,
+                            'offset': msg.offset,
+                            'message_key': msg.message_key,
+                            'message_value': msg.message_value,
+                            'message_headers': json.dumps(msg.message_headers) if msg.message_headers else None,
+                            'processed_at': msg.processed_at,
+                            'consumer_group': msg.consumer_group,
+                            'processing_status': msg.processing_status,
+                            'error_message': msg.error_message,
+                            'retry_count': msg.retry_count
+                        }
+                    )
                 session.commit()
-                
-                logger.debug(f"Successfully inserted {len(messages)} messages into database")
+                logger.info(f"Successfully stored {len(messages)} messages in database")
                 return True
-                
         except SQLAlchemyError as e:
-            logger.error(f"Database error inserting messages: {e}")
+            logger.error(f"Database error while storing messages: {e}")
             return False
         except Exception as e:
-            logger.error(f"Unexpected error inserting messages: {e}")
+            logger.error(f"Unexpected error while storing messages: {e}")
             return False
     
     def get_message_by_offset(self, topic: str, partition: int, offset: int) -> Optional[ProcessedMessage]:
@@ -387,8 +397,6 @@ class BaseKafkaConsumer(ABC):
         # Database manager
         self.db_manager = None
         if config.enable_database_storage and config.database_config:
-            if not MSSQL_AVAILABLE:
-                raise ImportError("MS SQL Server dependencies required for database storage")
             self.db_manager = DatabaseManager(config.database_config)
         
         # Setup signal handlers
@@ -441,7 +449,7 @@ class BaseKafkaConsumer(ABC):
                 processing_status='PROCESSING'
             )
         
-        for attempt in range(self.config.max_retries + 1):
+        for attempt in range(self.config.retry_count + 1):
             try:
                 success = self.message_handler(message, metadata)
                 if success:
@@ -464,8 +472,8 @@ class BaseKafkaConsumer(ABC):
                     
             except Exception as e:
                 logger.error(f"Error processing message (attempt {attempt + 1}): {e}")
-                if attempt < self.config.max_retries:
-                    time.sleep(self.config.retry_backoff_ms / 1000.0)
+                if attempt < self.config.retry_count:
+                    time.sleep(self.config.retry_interval)
                 else:
                     # Final failure - store with error status
                     if processed_msg:
@@ -982,15 +990,57 @@ def run_confluent_consumer_example():
         logger.error("Confluent Kafka not available")
         return
     
-    config = ConsumerConfig(
-        bootstrap_servers="localhost:9092",
-        group_id="confluent-consumer-group",
-        topics=["mongo.pages_topic"],
-        max_workers=4,
-        batch_size=10
+    # Setup database configuration
+    db_config = DatabaseConfig(
+        database="kafka_messages.db",
+        table_name="processed_messages",
+        create_table_if_not_exists=True
     )
     
-    consumer = ConfluentKafkaConsumer(config, sample_message_handler)
+    # Setup consumer configuration
+    consumer_config = ConsumerConfig(
+        bootstrap_servers="localhost:9092",
+        group_id="confluent-consumer-group",
+        topics=["test-topic"],
+        max_workers=4,
+        batch_size=100,
+        database_config=db_config,
+        enable_database_storage=True
+    )
+    
+    # Initialize database manager
+    db_manager = DatabaseManager(db_config)
+    
+    def message_handler(message: Any, metadata: Dict) -> bool:
+        try:
+            # Process the message (example: parse JSON)
+            if isinstance(message, bytes):
+                message = message.decode('utf-8')
+            data = json.loads(message)
+            
+            # Create processed message record
+            processed_msg = ProcessedMessage(
+                topic=metadata['topic'],
+                partition=metadata['partition'],
+                offset=metadata['offset'],
+                message_key=metadata.get('key'),
+                message_value=json.dumps(data),
+                message_headers=json.dumps(metadata.get('headers')),
+                consumer_group=consumer_config.group_id,
+                processing_status='SUCCESS'
+            )
+            
+            # Store in database
+            if consumer_config.enable_database_storage:
+                db_manager.insert_processed_messages([processed_msg])
+            
+            logger.info(f"Successfully processed message from {metadata['topic']}:{metadata['partition']}:{metadata['offset']}")
+            return True
+        except Exception as e:
+            logger.error(f"Error processing message: {e}")
+            return False
+    
+    consumer = ConfluentKafkaConsumer(consumer_config, message_handler)
     
     # Start stats reporting thread
     def report_stats():
@@ -1008,6 +1058,7 @@ def run_confluent_consumer_example():
         logger.info("Received interrupt signal")
     finally:
         consumer.shutdown()
+        db_manager.close()
 
 def run_kafka_python_consumer_example():
     """Example of running the Kafka Python consumer"""
@@ -1015,15 +1066,57 @@ def run_kafka_python_consumer_example():
         logger.error("Kafka Python not available")
         return
     
-    config = ConsumerConfig(
-        bootstrap_servers="localhost:9092",
-        group_id="kafka-python-consumer-group",
-        topics=["mongo.pages_topic"],
-        max_workers=4,
-        batch_size=10
+    # Setup database configuration
+    db_config = DatabaseConfig(
+        database="kafka_messages.db",
+        table_name="processed_messages",
+        create_table_if_not_exists=True
     )
     
-    consumer = KafkaPythonConsumer(config, sample_message_handler)
+    # Setup consumer configuration
+    consumer_config = ConsumerConfig(
+        bootstrap_servers="localhost:9092",
+        group_id="kafka-python-consumer-group",
+        topics=["test-topic"],
+        max_workers=4,
+        batch_size=100,
+        database_config=db_config,
+        enable_database_storage=True
+    )
+    
+    # Initialize database manager
+    db_manager = DatabaseManager(db_config)
+    
+    def message_handler(message: Any, metadata: Dict) -> bool:
+        try:
+            # Process the message (example: parse JSON)
+            if isinstance(message, bytes):
+                message = message.decode('utf-8')
+            data = json.loads(message)
+            
+            # Create processed message record
+            processed_msg = ProcessedMessage(
+                topic=metadata['topic'],
+                partition=metadata['partition'],
+                offset=metadata['offset'],
+                message_key=metadata.get('key'),
+                message_value=json.dumps(data),
+                message_headers=json.dumps(metadata.get('headers')),
+                consumer_group=consumer_config.group_id,
+                processing_status='SUCCESS'
+            )
+            
+            # Store in database
+            if consumer_config.enable_database_storage:
+                db_manager.insert_processed_messages([processed_msg])
+            
+            logger.info(f"Successfully processed message from {metadata['topic']}:{metadata['partition']}:{metadata['offset']}")
+            return True
+        except Exception as e:
+            logger.error(f"Error processing message: {e}")
+            return False
+    
+    consumer = KafkaPythonConsumer(consumer_config, message_handler)
     
     # Start stats reporting thread
     def report_stats():
@@ -1041,6 +1134,7 @@ def run_kafka_python_consumer_example():
         logger.info("Received interrupt signal")
     finally:
         consumer.shutdown()
+        db_manager.close()
 
 if __name__ == "__main__":
     if len(sys.argv) > 1:
