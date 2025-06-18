@@ -14,7 +14,7 @@ from abc import ABC, abstractmethod
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass, field
 from queue import Queue, Empty
-from typing import Dict, List, Optional, Callable, Any, Union
+from typing import Dict, List, Optional, Callable, Any
 from contextlib import contextmanager
 from datetime import datetime, timezone
 import uuid
@@ -1027,7 +1027,7 @@ def run_kafka_python_consumer_example():
     config = ConsumerConfig(
         bootstrap_servers="localhost:9092",
         group_id="kafka-python-consumer-group",
-        topics=["test-topic"],
+        topics=["mongo.pages_topic"],
         max_workers=4,
         batch_size=10
     )

@@ -14,7 +14,7 @@ from abc import ABC, abstractmethod
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass, field
 from queue import Queue, Empty
-from typing import Dict, List, Optional, Callable, Any
+from typing import Dict, List, Callable, Any
 from contextlib import contextmanager
 
 # Confluent Kafka imports
@@ -755,4 +755,3 @@ if __name__ == "__main__":
         print("- confluent: Uses confluent-kafka library")
         print("- kafka-python: Uses kafka-python library")
         print("\nUsage: python script.py [confluent|kafka-python]")
-        
