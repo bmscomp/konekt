@@ -1,0 +1,90 @@
+version: '3.8'
+
+services:
+  advanced-kafka-consumer:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        # Dynatrace configuration (set these in your environment or .env file)
+        DT_TENANT: ${DT_TENANT:-}
+        DT_API_TOKEN: ${DT_API_TOKEN:-}
+        DT_PAAS_TOKEN: ${DT_PAAS_TOKEN:-}
+        DT_CONNECTION_POINT: ${DT_CONNECTION_POINT:-}
+    container_name: advanced-kafka-consumer
+    restart: unless-stopped
+    depends_on:
+      - kafka
+    environment:
+      # Kafka Configuration
+      KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      KAFKA_GROUP_ID: advanced-consumer-group
+      KAFKA_TOPICS: ${KAFKA_TOPICS:-test-topic}
+      KAFKA_MAX_WORKERS: ${KAFKA_MAX_WORKERS:-4}
+      KAFKA_BATCH_SIZE: ${KAFKA_BATCH_SIZE:-50}
+      KAFKA_BATCH_TIMEOUT_MS: ${KAFKA_BATCH_TIMEOUT_MS:-5000}
+      KAFKA_ERROR_THRESHOLD: ${KAFKA_ERROR_THRESHOLD:-10}
+      KAFKA_ERROR_TIMEOUT_MS: ${KAFKA_ERROR_TIMEOUT_MS:-60000}
+      KAFKA_STATS_INTERVAL_MS: ${KAFKA_STATS_INTERVAL_MS:-30000}
+      KAFKA_COMMIT_INTERVAL_MS: ${KAFKA_COMMIT_INTERVAL_MS:-5000}
+      KAFKA_PARTITION_WORKERS: ${KAFKA_PARTITION_WORKERS:-2}
+      KAFKA_MAX_RETRIES: ${KAFKA_MAX_RETRIES:-3}
+      
+      # Logging Configuration
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+      LOG_FORMAT: json
+      
+      # Dynatrace Configuration
+      DT_TENANT: ${DT_TENANT:-}
+      DT_API_TOKEN: ${DT_API_TOKEN:-}
+      DT_PAAS_TOKEN: ${DT_PAAS_TOKEN:-}
+      DT_CONNECTION_POINT: ${DT_CONNECTION_POINT:-}
+      DT_LOGSTREAM: stdout
+      DT_TAGS: "environment=${ENVIRONMENT:-development},service=kafka-consumer,version=1.0"
+    
+    volumes:
+      # Mount logs directory for persistent logging
+      - consumer-logs:/app/logs
+      # Mount configuration if needed
+      - ./.env:/app/.env:ro
+    
+    ports:
+      # Expose metrics port for monitoring
+      - "8080:8080"
+    
+    networks:
+      - kafka-network
+    
+    # Resource limits
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+          cpus: '1.0'
+        reservations:
+          memory: 512M
+          cpus: '0.5'
+    
+    # Health check
+    healthcheck:
+      test: ["CMD", "pgrep", "-f", "advanced_kafka_consumer"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    
+    # Logging configuration
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "100m"
+        max-file: "5"
+        labels: "service=kafka-consumer,environment=${ENVIRONMENT:-development}"
+
+volumes:
+  consumer-logs:
+    driver: local
+
+networks:
+  kafka-network:
+    external: true
