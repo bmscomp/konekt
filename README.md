@@ -828,3 +828,237 @@ docker-compose ps sqlserver
 # Test database connection
 python check_drivers.py
 ```
+
+## Docker Deployment
+
+### Advanced Kafka Consumer with Dynatrace
+
+The project includes a production-ready Dockerfile for deploying the advanced Kafka consumer as a compiled Python application with Dynatrace OneAgent integration.
+
+#### Features
+
+- **Compiled Python Application**: Uses PyInstaller to create a single executable
+- **Dynatrace Integration**: Automatic OneAgent installation and configuration
+- **Multi-stage Build**: Optimized image size with separate build and runtime stages
+- **Security**: Runs as non-root user with minimal attack surface
+- **Health Checks**: Built-in container health monitoring
+- **Resource Management**: Configurable CPU and memory limits
+
+#### Quick Start
+
+1. **Configure Environment Variables**
+
+```bash
+# Copy the Docker environment template
+cp .env.docker .env.docker.local
+
+# Edit the configuration
+nano .env.docker.local
+```
+
+2. **Set Dynatrace Configuration** (Optional)
+
+```bash
+# Required for Dynatrace integration
+export DT_TENANT="your-tenant-id"
+export DT_PAAS_TOKEN="your-paas-token"
+export DT_API_TOKEN="your-api-token"
+```
+
+3. **Build and Deploy**
+
+```bash
+# Full deployment (build + run)
+./build-consumer.sh full
+
+# Or step by step
+./build-consumer.sh build
+./build-consumer.sh compose-up
+```
+
+#### Build Script Commands
+
+The `build-consumer.sh` script provides comprehensive deployment management:
+
+```bash
+# Build the Docker image
+./build-consumer.sh build
+
+# Run the container standalone
+./build-consumer.sh run
+
+# Start all services with Docker Compose
+./build-consumer.sh compose-up
+
+# View container logs
+./build-consumer.sh logs
+
+# Check container status and metrics
+./build-consumer.sh status
+
+# Stop services
+./build-consumer.sh compose-down
+
+# Clean up Docker resources
+./build-consumer.sh cleanup
+
+# Full deployment
+./build-consumer.sh full
+```
+
+#### Configuration
+
+##### Environment Variables
+
+Key configuration options in `.env.docker`:
+
+```bash
+# Dynatrace Configuration
+DT_TENANT=your-tenant-id
+DT_PAAS_TOKEN=your-paas-token
+DT_API_TOKEN=your-api-token
+
+# Kafka Consumer Configuration
+KAFKA_BOOTSTRAP_SERVERS=kafka:9092
+KAFKA_GROUP_ID=advanced-consumer-group
+KAFKA_TOPICS=test-topic,orders,events
+KAFKA_MAX_WORKERS=4
+KAFKA_BATCH_SIZE=50
+
+# Resource Limits
+MEMORY_LIMIT=1G
+CPU_LIMIT=1.0
+```
+
+##### Docker Compose Integration
+
+The consumer integrates with the existing Kafka infrastructure:
+
+```yaml
+# docker-compose.consumer.yml
+services:
+  advanced-kafka-consumer:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    depends_on:
+      - kafka
+    environment:
+      KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+    networks:
+      - kafka-network
+```
+
+#### Monitoring and Observability
+
+##### Dynatrace Integration
+
+When properly configured, the container includes:
+
+- **OneAgent**: Automatic application and infrastructure monitoring
+- **Custom Tags**: Environment, service, and version tagging
+- **Log Forwarding**: Application logs sent to Dynatrace
+- **Process Monitoring**: Real-time process and resource monitoring
+
+##### Health Checks
+
+Built-in health monitoring:
+
+```bash
+# Check container health
+docker inspect advanced-kafka-consumer --format='{{.State.Health.Status}}'
+
+# View health check logs
+docker inspect advanced-kafka-consumer --format='{{range .State.Health.Log}}{{.Output}}{{end}}'
+```
+
+##### Metrics Endpoint
+
+The consumer exposes metrics on port 8080:
+
+```bash
+# Access metrics (if implemented)
+curl http://localhost:8080/metrics
+```
+
+#### Production Considerations
+
+##### Security
+
+- Runs as non-root user (`appuser`)
+- Minimal base image (Python slim)
+- No unnecessary packages in runtime image
+- Secrets managed via environment variables
+
+##### Performance
+
+- Compiled Python application for faster startup
+- Optimized resource allocation
+- Configurable worker threads and batch sizes
+- Connection pooling for database operations
+
+##### Reliability
+
+- Automatic restart on failure
+- Graceful shutdown handling
+- Health checks for container orchestration
+- Persistent logging with log rotation
+
+#### Troubleshooting
+
+##### Build Issues
+
+```bash
+# Check build logs
+docker build --no-cache -t advanced-kafka-consumer .
+
+# Verify Dynatrace token access
+curl -H "Authorization: Api-Token $DT_PAAS_TOKEN" \
+  "https://$DT_TENANT.live.dynatrace.com/api/v1/deployment/installer/agent/unix/default/latest?arch=x86&flavor=default"
+```
+
+##### Runtime Issues
+
+```bash
+# Check container logs
+./build-consumer.sh logs
+
+# Inspect container configuration
+docker inspect advanced-kafka-consumer
+
+# Check resource usage
+docker stats advanced-kafka-consumer
+
+# Verify network connectivity
+docker exec advanced-kafka-consumer ping kafka
+```
+
+##### Dynatrace Issues
+
+```bash
+# Verify OneAgent installation
+docker exec advanced-kafka-consumer ls -la /opt/dynatrace/
+
+# Check OneAgent logs
+docker exec advanced-kafka-consumer cat /var/log/dynatrace/oneagent/oneagent.log
+
+# Test connectivity to Dynatrace
+docker exec advanced-kafka-consumer curl -I https://$DT_TENANT.live.dynatrace.com
+```
+
+#### File Structure
+
+```
+.
+├── Dockerfile                      # Multi-stage build with Dynatrace
+├── docker-compose.consumer.yml     # Consumer service configuration
+├── build-consumer.sh              # Build and deployment script
+├── .env.docker                    # Docker environment template
+└── advanced_kafka_consumer.py     # Source application
+```
+
+This Docker deployment provides a production-ready, monitored, and scalable solution for running the advanced Kafka consumer in containerized environments.
+
+## License
+
+This project is licensed under the MIT License. See the LICENSE file for details.
