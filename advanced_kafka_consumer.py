@@ -17,7 +17,7 @@ from typing import Dict, List, Callable, Any, Optional
 from contextlib import contextmanager
 import traceback
 from collections import defaultdict
-import uuid
+
 
 try:
     from confluent_kafka import Consumer, KafkaError, KafkaException, TopicPartition
@@ -137,7 +137,10 @@ class PartitionWorker:
         self.shutdown_event = threading.Event()
         self.stats_lock = threading.Lock()
         self.error_count = 0
+        self.success_count = 0
         self.paused = False
+        self.pause_time = None
+        self.pause_duration = 60  # Start with 1 minute pause
         
     def start(self):
         """Start the partition worker"""
@@ -164,8 +167,12 @@ class PartitionWorker:
     
     def submit_batch(self, batch: MessageBatch) -> bool:
         """Submit a batch for processing"""
+        # Check if partition should be resumed
+        if self.paused and self._should_resume():
+            self._resume_partition()
+        
         if self.paused:
-            logger.warning(f"Partition {self.partition_id} is paused due to errors")
+            logger.debug(f"Partition {self.partition_id} is paused due to errors")
             return False
             
         try:
@@ -174,6 +181,21 @@ class PartitionWorker:
         except Exception as e:
             logger.error(f"Failed to queue batch for partition {self.partition_id}: {e}")
             return False
+    
+    def _should_resume(self) -> bool:
+        """Check if partition should be resumed from pause"""
+        if not self.paused or not self.pause_time:
+            return False
+        
+        # Resume after pause duration
+        return time.time() - self.pause_time > self.pause_duration
+    
+    def _resume_partition(self):
+        """Resume partition processing"""
+        self.paused = False
+        self.pause_time = None
+        self.error_count = 0  # Reset error count
+        logger.info(f"Resuming partition {self.partition_id} after pause")
     
     def _worker_loop(self):
         """Main worker loop"""
@@ -195,28 +217,38 @@ class PartitionWorker:
         """Process a batch of messages"""
         start_time = time.time()
         successful_offsets = []
+        batch_errors = 0
         
         for message, offset, timestamp in zip(batch.messages, batch.offsets, batch.timestamps):
             try:
                 if self._process_message_with_retry(message):
                     successful_offsets.append(offset)
+                    self.success_count += 1
                     with self.stats_lock:
                         self.consumer_stats.messages_processed += 1
                 else:
-                    logger.error(f"Failed to process message at offset {offset}")
+                    logger.warning(f"Failed to process message at offset {offset}")
+                    batch_errors += 1
                     with self.stats_lock:
                         self.consumer_stats.messages_failed += 1
                         self.consumer_stats.error_count_by_partition[self.partition_id] += 1
-                    
-                    self.error_count += 1
-                    if self.error_count >= self.config.error_threshold:
-                        self._pause_partition()
                         
             except Exception as e:
                 logger.error(f"Unexpected error processing message at offset {offset}: {e}")
+                batch_errors += 1
                 with self.stats_lock:
                     self.consumer_stats.messages_failed += 1
                     self.consumer_stats.error_count_by_partition[self.partition_id] += 1
+        
+        # Update error tracking
+        self.error_count += batch_errors
+        
+        # Check if should pause partition (more reasonable threshold)
+        total_processed = self.success_count + self.error_count
+        if total_processed > 10:  # Only check after processing some messages
+            error_rate = self.error_count / total_processed
+            if error_rate > 0.5 and self.error_count >= 5:  # 50% error rate with at least 5 errors
+                self._pause_partition()
         
         # Record processing time
         processing_time = time.time() - start_time
@@ -244,16 +276,17 @@ class PartitionWorker:
     
     def _pause_partition(self):
         """Pause partition processing due to errors"""
-        self.paused = True
-        logger.warning(f"Pausing partition {self.partition_id} due to error threshold reached")
-        # Could implement exponential backoff for resume
+        if not self.paused:
+            self.paused = True
+            self.pause_time = time.time()
+            logger.warning(f"Pausing partition {self.partition_id} due to high error rate "
+                          f"(errors: {self.error_count}, successes: {self.success_count})")
+            # Exponential backoff for pause duration
+            self.pause_duration = min(self.pause_duration * 2, 300)  # Max 5 minutes
     
     def _handle_worker_error(self):
         """Handle worker-level errors"""
         self.error_count += 1
-        if self.error_count >= self.config.error_threshold:
-            self._pause_partition()
-
 
 class AdvancedKafkaConsumer:
     """Advanced partition-aware Kafka consumer with fault tolerance"""
@@ -535,7 +568,7 @@ def sample_message_handler(message: Any) -> bool:
         if isinstance(message, str):
             try:
                 data = json.loads(message)
-                logger.info(f"Processed JSON message: {data.get('id', 'no-id')}")
+                #logger.info(f"Processed JSON message: {type(data)}")
             except json.JSONDecodeError:
                 logger.info(f"Processed text message: {message[:100]}...")
         else:
@@ -555,14 +588,14 @@ def main():
     # Configuration
     config = KafkaConfig(
         bootstrap_servers="localhost:9092",
-        group_id=f"advanced-consumer-{uuid.uuid4().hex[:8]}",
+        group_id=f"advanced-consumer-python-pages_topic",
         topics=["mongo.pages_topic"],  # Change to your topic
         max_workers=4,
-        partition_workers=1,
-        batch_size=50,
+        partition_workers=4,
+        batch_size=1000,
         batch_timeout_ms=5000,
         max_retries=3,
-        error_threshold=10
+        error_threshold=100  # Increase threshold to prevent premature pausing
     )
     
     # Create and start consumer

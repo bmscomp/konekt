@@ -1,254 +1,43 @@
-# Konekt make you data synched with Kafka and Kafka connect
+# Konekt: Data Synchronization with Kafka and Kafka Connect
 
-This project demonstrates a scalable data processing pipeline using Kafka, MongoDB, and Python. It includes several Kafka consumer implementations and a data seeder for MongoDB.
-
-## Prerequisites
-
-- [Docker](https://www.docker.com/get-started) and [Docker Compose](https://docs.docker.com/compose/install/)
-- [Python](https://www.python.org/downloads/) 3.8 or higher
-- [Git](https://git-scm.com/downloads) (optional)
-
-## Project Structure
-
-```
-.
-├── docker-compose.yml          # Docker services configuration
-├── requirements.txt            # Python dependencies
-├── .gitignore                  # Git ignore file
-├── Seeder.py                   # Data seeder for MongoDB
-├── ScalableKafkaConsumer.py    # Base Kafka consumer class
-├── DynamicScalableKafkaConsumer.py  # Consumer with dynamic scaling
-├── PartitionAwareConsumer.py   # Consumer with partition awareness
-└── mongo-init/                 # MongoDB initialization scripts
-    └── 01-init.js              # Initial data and user setup
-```
-
-## Setting Up Docker Environment
-
-### 1. Start Docker Services
-
-The project uses Docker Compose to set up the following services:
-- SQL Server
-- MongoDB
-- Kafka (broker)
-- Schema Registry
-- Kafka Connect
-- Control Center
-
-To start all services:
-
-```bash
-docker-compose up -d
-```
-
-This command starts all services in detached mode. The `-d` flag runs containers in the background.
-
-### 2. Check Service Status
-
-Verify that all services are running:
-
-```bash
-docker-compose ps
-```
-
-### 3. Access Service UIs
-
-- **Kafka Control Center**: http://localhost:9021
-- **Schema Registry**: http://localhost:8081
-- **Kafka Connect**: http://localhost:8083
-
-### 4. Stop Docker Services
-
-When you're done working with the project:
-
-```bash
-docker-compose down
-```
-
-To remove volumes as well (this will delete all data):
-
-```bash
-docker-compose down -v
-```
-
-## Setting Up Python Virtual Environment
-
-### 1. Create a Virtual Environment
-
-```bash
-# Create a virtual environment
-python -m venv venv
-
-# Activate the virtual environment
-# On Windows:
-venv\Scripts\activate
-# On macOS/Linux:
-source .venv/bin/activate
-```
-
-### 2. Install Dependencies
-
-```bash
-pip install -r requirements.txt
-```
-
-### 3. Configure Kaggle API (for Seeder.py)
-
-To use the Seeder.py script, you need to set up Kaggle API credentials:
-
-1. Create a Kaggle account if you don't have one: https://www.kaggle.com/
-2. Go to your Kaggle account settings and create an API token
-3. Download the `kaggle.json` file and place it in `~/.kaggle/` directory:
-
-```bash
-# Create the directory if it doesn't exist
-mkdir -p ~/.kaggle
-
-# Move the downloaded kaggle.json file
-mv path/to/downloaded/kaggle.json ~/.kaggle/
-
-# Set proper permissions
-chmod 600 ~/.kaggle/kaggle.json
-```
-
-## Running Python Scripts
-
-Ensure your virtual environment is activated before running any scripts.
-
-### 1. Seed Data to MongoDB
-
-```bash
-python Seeder.py
-```
-
-This script:
-- Authenticates with the Kaggle API
-- Downloads a dataset from Kaggle
-- Processes JSON files (supports both JSON arrays and JSON Lines format)
-- Inserts the data into MongoDB in batches
-
-### 2. Run Kafka Consumers
-
-#### Basic Scalable Consumer
-
-```bash
-python ScalableKafkaConsumer.py
-```
-
-#### Dynamic Scalable Consumer
-
-```bash
-python DynamicScalableKafkaConsumer.py
-```
-
-#### Partition-Aware Consumer
-
-```bash
-python PartitionAwareConsumer.py
-```
-
-## Customizing Consumers
-
-You can customize the consumer behavior by modifying the following parameters in the scripts:
-
-- `TOPIC`: The Kafka topic to consume from
-- `BOOTSTRAP_SERVERS`: Kafka broker addresses
-- `GROUP_ID`: Consumer group ID
-- `NUM_WORKERS`: Number of worker threads (for ScalableKafkaConsumer)
-- `min_workers` and `max_workers`: Worker thread limits (for DynamicScalableKafkaConsumer)
-- `num_workers_per_partition`: Workers per partition (for PartitionAwareConsumer)
-
-## MongoDB Connection Details
-
-- **Host**: localhost
-- **Port**: 27017
-- **Username**: storeuser
-- **Password**: secret
-- **Database**: store
-
-## Troubleshooting
-
-### Docker Issues
-
-1. **Services not starting**: Check Docker logs with `docker-compose logs [service_name]`
-2. **Port conflicts**: Ensure the required ports (1433, 27017, 9092, etc.) are not in use
-
-### Python Issues
-
-1. **Module not found errors**: Ensure all dependencies are installed with `pip install -r requirements.txt`
-2. **Kafka connection errors**: Verify Kafka broker is running with `docker-compose ps broker`
-3. **MongoDB connection errors**: Check MongoDB status with `docker-compose ps mongo`
-
-## Extending the Project
-
-- Add new consumer implementations by extending the base `ScalableKafkaConsumer` class
-- Modify the MongoDB initialization script to create additional collections
-- Add new data sources to the Seeder.py script
-
-## Create a connector from curl command
-
-curl -X POST -H "Content-Type: application/json" --data @mongo-source-connector.json http://localhost:8083/connectors
-
-## Mongo Key file for replicaSet
-
-openssl rand -base64 756 > mongodb-keyfile
-chmod 400 mongodb-keyfile  # Restrict permissions
-chmod +x scripts/setup.sh
-
-
-## Mongo db connection
-
-mongodb://localhost:27017,localhost:27018,localhost:27019/?replicaSet=rs0&authSource=admin
-
-## Create a connector on localhost instance.
-
-curl -X POST -H "Content-Type: application/json" --data @mongo-source-connector.json http://localhost:8083/connectors
-
-
-
-# Partition-Aware and Resilient Kafka Consumers with Multi-Threading
-
-This guide provides comprehensive implementations of partition-aware and resilient Kafka consumers using both `confluent-kafka` and `kafka-python` libraries with multi-threaded models in Python.
+A comprehensive data processing framework integrating Kafka, MongoDB, and SQL Server with Python. This project provides multiple robust Kafka consumer implementations, Docker configurations, and data management tools.
 
 ## Table of Contents
 
 1. [Overview](#overview)
-2. [Key Features](#key-features)
-3. [Architecture](#architecture)
-4. [Implementation Details](#implementation-details)
-5. [Configuration](#configuration)
-6. [Usage Examples](#usage-examples)
-7. [Best Practices](#best-practices)
-8. [Dependencies](#dependencies)
-9. [Installation](#installation)
+2. [Architecture](#architecture)
+3. [Project Structure](#project-structure)
+4. [Prerequisites](#prerequisites)
+5. [Setting Up the Environment](#setting-up-the-environment)
+   - [Docker Environment](#docker-environment)
+   - [Python Virtual Environment](#python-virtual-environment)
+   - [Configuration Files](#configuration-files)
+6. [Scripts and Programs](#scripts-and-programs)
+   - [Basic Kafka Consumer](#basic-kafka-consumer)
+   - [Advanced Kafka Consumer](#advanced-kafka-consumer)
+   - [Kafka SQL Server Consumer](#kafka-sql-server-consumer)
+   - [Database Scripts](#database-scripts)
+   - [Utility Scripts](#utility-scripts)
+7. [Docker Configurations](#docker-configurations)
+   - [Docker Compose](#docker-compose)
+   - [MongoDB Configuration](#mongodb-configuration)
+8. [Usage Examples](#usage-examples)
+9. [Best Practices](#best-practices)
+10. [Performance Tuning](#performance-tuning)
+11. [Troubleshooting](#troubleshooting)
+12. [License](#license)
 
 ## Overview
 
-The implementation provides two robust Kafka consumer implementations that handle partition awareness, resilience, and multi-threading efficiently. Both consumers are designed for production use with comprehensive error handling, monitoring, and graceful shutdown capabilities.
+This project demonstrates a scalable data processing pipeline using Kafka, MongoDB, SQL Server, and Python. It includes several Kafka consumer implementations with different features:
 
-## Key Features
+- Basic scalable consumers
+- Advanced partition-aware consumers
+- Database integration with SQLite and SQL Server
+- Multi-threading and resilience features
+- Docker configurations for all required services
 
-### Partition Awareness
-
-- **Dedicated partition workers**: Each assigned partition gets its own worker thread
-- **Partition-specific queues**: Messages are queued per partition to maintain ordering
-- **Dynamic partition handling**: Automatically handles partition assignment/revocation
-- **Batch processing**: Configurable batch sizes for efficient processing
-
-### Resilience
-
-- **Retry logic**: Configurable retry attempts with exponential backoff
-- **Graceful shutdown**: Proper signal handling and resource cleanup  
-- **Error handling**: Comprehensive error handling at all levels
-- **Offset management**: Manual offset commits only after successful processing
-- **Health monitoring**: Built-in statistics and monitoring
-
-### Multi-threading
-
-- **ThreadPoolExecutor**: For managing worker threads efficiently
-- **Per-partition workers**: Maintains message ordering within partitions
-- **Thread-safe operations**: Proper synchronization for shared resources
-- **Configurable concurrency**: Adjustable number of worker threads
+The framework provides reliable message processing with transaction support, fault tolerance, and performance monitoring.
 
 ## Architecture
 
@@ -312,22 +101,6 @@ class KafkaPythonConsumer(BaseKafkaConsumer):
         # Monitor and setup workers for partition changes
 ```
 
-## Implementation Details
-
-### Consumer Configuration
-
-```python
-@dataclass
-class ConsumerConfig:
-    bootstrap_servers: str = "localhost:9092"
-    group_id: str = "default-group"
-    topics: List[str] = field(default_factory=list)
-    max_workers: int = 4
-    batch_size: int = 10
-    max_retries: int = 3
-    # ... additional configuration options
-```
-
 ### Message Batch Processing
 
 ```python
@@ -372,683 +145,686 @@ Both implementations support graceful shutdown through:
 - **Resource cleanup**: Proper cleanup of threads, connections, and queues
 - **Final processing**: Completion of in-flight messages before shutdown
 
-## Configuration
+## Project Structure
 
-### Basic Configuration
+```
+.
+├── advanced_kafka_consumer.py       # Advanced partition-aware Kafka consumer implementation
+├── check_drivers.py                 # Utility to verify database drivers
+├── data.py                          # Data processing utilities
+├── docker-compose-mongo.yaml        # Docker Compose for MongoDB services
+├── docker-compose.yml               # Main Docker Compose configuration
+├── example_usage.py                 # Usage examples for the consumers
+├── kafka_sqlserver_consumer.py      # SQL Server integrated Kafka consumer
+├── loader.py                        # Data loading utilities
+├── mongo-source-connector.json      # MongoDB source connector configuration
+├── mongo_health.py                  # MongoDB health check script
+├── requirements.txt                 # Main Python dependencies
+├── requirements_advanced.txt        # Additional dependencies for advanced features
+├── script.py                        # Basic Kafka consumer implementation
+├── script_db.py                     # SQLite database integrated Kafka consumer
+├── script_db_sqlserver.py           # SQL Server integrated consumer implementation
+├── setup_sqlserver_driver.sh        # SQL Server driver setup script
+├── .env.example                     # Example environment variables
+├── mongo-init/                      # MongoDB initialization scripts
+│   └── 01-init.js                   # Initial MongoDB setup
+└── scripts/                         # Utility scripts
+    └── setup.sh                     # Environment setup script
+```
+
+## Prerequisites
+
+### Software Requirements
+
+- **Docker and Docker Compose**: For running Kafka, MongoDB, and SQL Server services
+  - Docker version 20.10.0 or higher
+  - Docker Compose version 2.0.0 or higher
+
+- **Python**: For running the consumer scripts and utilities
+  - Python 3.8 or higher
+  - pip package manager
+
+- **Database Drivers**:
+  - ODBC Driver for SQL Server (v17 or v18)
+  - SQLite (included with Python)
+
+### Hardware Recommendations
+
+- **Memory**: Minimum 8GB RAM (16GB recommended for full stack)
+- **CPU**: 4+ cores recommended for optimal performance
+- **Disk**: 10GB minimum free space
+
+### Network Requirements
+
+- Available ports:
+  - Kafka Broker: 9092
+  - Zookeeper: 2181
+  - Schema Registry: 8081
+  - Kafka Connect: 8083
+  - Control Center: 9021
+  - MongoDB: 27017, 27018, 27019
+  - SQL Server: 1433
+
+## Setting Up the Environment
+
+### Docker Environment
+
+#### 1. Start Docker Services
+
+The project uses Docker Compose to set up the following services:
+- SQL Server
+- MongoDB
+- Kafka (broker)
+- Schema Registry
+- Kafka Connect
+- Control Center
+
+To start all services:
+
+```bash
+# Start all services in detached mode
+docker-compose up -d
+
+# For MongoDB replica set only
+docker-compose -f docker-compose-mongo.yaml up -d
+```
+
+#### 2. Check Service Status
+
+Verify that all services are running:
+
+```bash
+docker-compose ps
+```
+
+#### 3. Access Service UIs
+
+- **Kafka Control Center**: http://localhost:9021
+- **Schema Registry**: http://localhost:8081
+- **Kafka Connect**: http://localhost:8083
+
+#### 4. Stop Docker Services
+
+When you're done working with the project:
+
+```bash
+# Stop services without removing data
+docker-compose down
+
+# Stop services and remove volumes (deletes all data)
+docker-compose down -v
+```
+
+### Python Virtual Environment
+
+#### 1. Create a Virtual Environment
+
+```bash
+# Create a virtual environment
+python -m venv .venv
+
+# Activate the virtual environment
+# On Windows:
+.venv\Scripts\activate
+# On macOS/Linux:
+source .venv/bin/activate
+```
+
+#### 2. Install Dependencies
+
+```bash
+# Install base requirements
+pip install -r requirements.txt
+
+# For advanced consumer features
+pip install -r requirements_advanced.txt
+```
+
+#### 3. SQL Server Driver Setup
+
+For SQL Server integration, install the required ODBC drivers:
+
+```bash
+# On Linux/macOS (requires sudo)
+chmod +x setup_sqlserver_driver.sh
+./setup_sqlserver_driver.sh
+
+# On Windows
+# Download and install the Microsoft ODBC Driver from Microsoft's website
+```
+
+### Configuration Files
+
+#### Environment Variables
+
+Copy the example environment file and customize it for your setup:
+
+```bash
+cp .env.example .env
+# Edit .env with your configuration
+```
+
+Key environment variables:
+
+```bash
+# Kafka Configuration
+KAFKA_BOOTSTRAP_SERVERS=localhost:9092
+KAFKA_GROUP_ID=kafka_consumer
+KAFKA_TOPICS=topic1,topic2,topic3
+
+# SQL Server Configuration
+SQLSERVER_HOST=localhost
+SQLSERVER_PORT=1433
+SQLSERVER_DB=kafka_messages
+SQLSERVER_USER=sa
+SQLSERVER_PASSWORD=YourPassword123!
+SQLSERVER_DRIVER=ODBC Driver 18 for SQL Server
+```
+
+#### MongoDB Replica Set Configuration
+
+Set up MongoDB key file for authentication:
+
+```bash
+# Generate keyfile
+openssl rand -base64 756 > mongodb-keyfile
+chmod 400 mongodb-keyfile
+
+# Run initialization script
+chmod +x scripts/setup.sh
+./scripts/setup.sh
+```
+
+#### Kafka Connect Configuration
+
+Configure MongoDB source connector:
+
+```bash
+# Review and modify mongo-source-connector.json as needed
+
+# Create connector
+curl -X POST -H "Content-Type: application/json" --data @mongo-source-connector.json http://localhost:8083/connectors
+```
+
+## Scripts and Programs
+
+### Basic Kafka Consumer
+
+`script.py` provides a basic Kafka consumer implementation with support for both `confluent-kafka` and `kafka-python` libraries.
+
+#### Key Features
+
+- Dual library support (confluent-kafka and kafka-python)
+- Multi-threading with partition awareness
+- Error handling and retry logic
+- Graceful shutdown handling
+
+#### Usage
+
+```bash
+# Run with confluent-kafka implementation
+python script.py confluent
+
+# Run with kafka-python implementation
+python script.py kafka-python
+```
+
+#### Configuration
 
 ```python
+# Example configuration
 config = ConsumerConfig(
     bootstrap_servers="localhost:9092",
     group_id="my-consumer-group",
     topics=["my-topic"],
-    max_workers=4,
-    batch_size=10
-)
-```
-
-### Advanced Configuration
-
-```python
-config = ConsumerConfig(
-    bootstrap_servers="broker1:9092,broker2:9092,broker3:9092",
-    group_id="advanced-consumer-group",
-    topics=["topic1", "topic2"],
-    max_workers=8,
-    batch_size=50,
-    max_retries=5,
-    retry_backoff_ms=2000,
-    session_timeout_ms=30000,
-    heartbeat_interval_ms=10000,
-    max_poll_interval_ms=300000,
-    partition_assignment_strategy="range"
-)
-```
-
-### Environment-Based Configuration
-
-```python
-import os
-
-config = ConsumerConfig(
-    bootstrap_servers=os.getenv("KAFKA_BROKERS", "localhost:9092"),
-    group_id=os.getenv("CONSUMER_GROUP", "default-group"),
-    topics=os.getenv("KAFKA_TOPICS", "").split(","),
-    max_workers=int(os.getenv("MAX_WORKERS", "4")),
-    batch_size=int(os.getenv("BATCH_SIZE", "10"))
-)
-```
-
-## Usage Examples
-
-### Basic Usage
-
-```python
-def simple_message_handler(message: Any) -> bool:
-    print(f"Processing message: {message}")
-    return True
-
-# Confluent Kafka Consumer
-if CONFLUENT_AVAILABLE:
-    config = ConsumerConfig(
-        bootstrap_servers="localhost:9092",
-        group_id="simple-group",
-        topics=["test-topic"]
-    )
-    consumer = ConfluentKafkaConsumer(config, simple_message_handler)
-    consumer.start()
-```
-
-### Advanced Message Handler
-
-```python
-import json
-import logging
-
-def advanced_message_handler(message: Any) -> bool:
-    try:
-        # Parse JSON message
-        if isinstance(message, str):
-            data = json.loads(message)
-        else:
-            data = message
-        
-        # Business logic processing
-        user_id = data.get('user_id')
-        event_type = data.get('event_type')
-        
-        if event_type == 'user_signup':
-            process_user_signup(user_id, data)
-        elif event_type == 'user_purchase':
-            process_user_purchase(user_id, data)
-        else:
-            logging.warning(f"Unknown event type: {event_type}")
-        
-        return True
-        
-    except json.JSONDecodeError:
-        logging.error(f"Invalid JSON message: {message}")
-        return False
-    except Exception as e:
-        logging.error(f"Processing error: {e}")
-        return False
-
-def process_user_signup(user_id: str, data: dict):
-    # Implement user signup logic
-    pass
-
-def process_user_purchase(user_id: str, data: dict):
-    # Implement purchase processing logic
-    pass
-```
-
-### Running with Monitoring
-
-```python
-import threading
-import time
-
-def run_consumer_with_monitoring():
-    config = ConsumerConfig(
-        bootstrap_servers="localhost:9092",
-        group_id="monitored-group",
-        topics=["events"],
-        max_workers=6,
-        batch_size=20
-    )
-    
-    consumer = ConfluentKafkaConsumer(config, advanced_message_handler)
-    
-    # Stats reporting thread
-    def report_stats():
-        while consumer.running:
-            time.sleep(30)
-            stats = consumer.get_stats()
-            logging.info(f"Consumer Stats: {stats}")
-    
-    stats_thread = threading.Thread(target=report_stats, daemon=True)
-    stats_thread.start()
-    
-    try:
-        consumer.start()
-    except KeyboardInterrupt:
-        logging.info("Shutdown requested")
-    finally:
-        consumer.shutdown()
-```
-
-### Command Line Interface
-
-```python
-import sys
-import argparse
-
-def main():
-    parser = argparse.ArgumentParser(description='Kafka Consumer')
-    parser.add_argument('--library', choices=['confluent', 'kafka-python'], 
-                       required=True, help='Kafka library to use')
-    parser.add_argument('--brokers', default='localhost:9092', 
-                       help='Kafka brokers')
-    parser.add_argument('--group', required=True, help='Consumer group ID')
-    parser.add_argument('--topics', required=True, nargs='+', 
-                       help='Topics to consume')
-    parser.add_argument('--workers', type=int, default=4, 
-                       help='Number of worker threads')
-    
-    args = parser.parse_args()
-    
-    config = ConsumerConfig(
-        bootstrap_servers=args.brokers,
-        group_id=args.group,
-        topics=args.topics,
-        max_workers=args.workers
-    )
-    
-    if args.library == 'confluent':
-        consumer = ConfluentKafkaConsumer(config, advanced_message_handler)
-    else:
-        consumer = KafkaPythonConsumer(config, advanced_message_handler)
-    
-    consumer.start()
-
-if __name__ == "__main__":
-    main()
-```
-
-## Best Practices
-
-### 1. Partition Ordering
-- Messages within a partition are processed in order
-- Use partition keys strategically to ensure related messages are in the same partition
-- Avoid cross-partition transactions
-
-### 2. Offset Management
-- Manual offset commits ensure at-least-once delivery
-- Commit offsets only after successful processing
-- Use batch commits for better performance
-
-### 3. Error Handling
-- Implement proper retry logic with exponential backoff
-- Use dead letter queues for messages that consistently fail
-- Log errors with sufficient context for debugging
-
-### 4. Resource Management
-- Properly size worker thread pools based on workload
-- Monitor memory usage, especially with large batches
-- Implement proper cleanup in shutdown handlers
-
-### 5. Monitoring and Observability
-
-```python
-# Example metrics collection
-class ConsumerMetrics:
-    def __init__(self):
-        self.messages_processed = 0
-        self.messages_failed = 0
-        self.processing_time = []
-        self.last_commit_time = time.time()
-    
-    def record_processing_time(self, duration):
-        self.processing_time.append(duration)
-        # Keep only last 1000 measurements
-        self.processing_time = self.processing_time[-1000:]
-    
-    def get_avg_processing_time(self):
-        return sum(self.processing_time) / len(self.processing_time) if self.processing_time else 0
-```
-
-### 6. Configuration Management
-
-```python
-# Use environment-specific configurations
-class EnvironmentConfig:
-    @classmethod
-    def for_development(cls):
-        return ConsumerConfig(
-            bootstrap_servers="localhost:9092",
-            max_workers=2,
-            batch_size=5
-        )
-    
-    @classmethod
-    def for_production(cls):
-        return ConsumerConfig(
-            bootstrap_servers=os.getenv("KAFKA_BROKERS"),
-            max_workers=8,
-            batch_size=50,
-            session_timeout_ms=30000,
-            max_poll_interval_ms=300000
-        )
-```
-
-## Performance Tuning
-
-### Batch Size Optimization
-
-```python
-# Small batches: Lower latency, higher overhead
-config.batch_size = 1-10
-
-# Medium batches: Balanced performance
-config.batch_size = 10-50
-
-# Large batches: Higher throughput, higher latency
-config.batch_size = 50-500
-```
-
-### Worker Thread Tuning
-
-```python
-# CPU-bound processing
-config.max_workers = multiprocessing.cpu_count()
-
-# I/O-bound processing
-config.max_workers = multiprocessing.cpu_count() * 2-4
-
-# Mixed workload
-config.max_workers = multiprocessing.cpu_count() * 1.5
-```
-
-## Dependencies
-
-### Core Dependencies
-
-```txt
-# Kafka client libraries
-confluent-kafka>=2.3.0
-kafka-python>=2.0.2
-
-# Threading and async operations
-threading-utils>=0.3
-concurrent-futures>=3.1.1
-
-# Logging and monitoring
-structlog>=23.2.0
-python-json-logger>=2.0.7
-
-# Configuration management
-pydantic>=2.5.0
-python-dotenv>=1.0.0
-```
-
-### Optional Dependencies
-
-```txt
-# Serialization formats
-msgpack>=1.0.7
-avro-python3>=1.11.3
-fastavro>=1.9.4
-protobuf>=4.25.1
-
-# Monitoring and metrics
-prometheus-client>=0.19.0
-statsd>=4.0.1
-
-# Schema registry support
-confluent-kafka[avro]>=2.3.0
-confluent-kafka[json]>=2.3.0
-confluent-kafka[protobuf]>=2.3.0
-```
-
-### Development Dependencies
-
-```txt
-# Testing
-pytest>=7.4.3
-pytest-asyncio>=0.21.1
-pytest-mock>=3.12.0
-pytest-cov>=4.1.0
-
-# Code quality
-black>=23.11.0
-flake8>=6.1.0
-mypy>=1.7.1
-isort>=5.12.0
-```
-
-## Installation
-
-### Basic Installation
-
-```bash
-# Install core dependencies
-pip install confluent-kafka kafka-python
-
-# Install from requirements file
-pip install -r requirements.txt
-```
-
-### Development Installation
-
-```bash
-# Install all dependencies including development tools
-pip install -r requirements.txt
-
-# Install in development mode (if using setup.py)
-pip install -e .
-```
-
-### Docker Installation
-
-```dockerfile
-FROM python:3.11-slim
-
-WORKDIR /app
-
-COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
-
-COPY . .
-
-CMD ["python", "kafka_consumer.py", "confluent"]
-```
-
-## Troubleshooting
-
-### Common Issues
-
-1. **Partition Rebalancing**
-   - Increase `session_timeout_ms` for slow processing
-   - Reduce `max_poll_interval_ms` for faster detection
-   - Monitor consumer lag
-
-2. **Memory Issues**
-   - Reduce batch sizes
-   - Limit worker thread count
-   - Monitor queue sizes
-
-3. **Connection Issues**
-   - Verify broker connectivity
-   - Check security settings (SSL/SASL)
-   - Review network configuration
-
-4. **Performance Issues**
-   - Profile message handlers
-   - Optimize batch processing
-   - Consider async processing for I/O operations
-
-### Debugging
-
-```python
-# Enable debug logging
-logging.getLogger('confluent_kafka').setLevel(logging.DEBUG)
-logging.getLogger('kafka').setLevel(logging.DEBUG)
-
-# Add performance monitoring
-import time
-
-class TimedMessageHandler:
-    def __init__(self, handler):
-        self.handler = handler
-        self.processing_times = []
-    
-    def __call__(self, message):
-        start_time = time.time()
-        result = self.handler(message)
-        processing_time = time.time() - start_time
-        self.processing_times.append(processing_time)
-        
-        if len(self.processing_times) % 100 == 0:
-            avg_time = sum(self.processing_times[-100:]) / 100
-            logging.info(f"Average processing time (last 100): {avg_time:.3f}s")
-        
-        return result
-```
-
-This comprehensive implementation provides production-ready Kafka consumers with partition awareness, resilience, and multi-threading capabilities suitable for high-throughput, mission-critical applications.
-
-## script_db.py Implementation
-
-`script_db.py` is a robust Kafka consumer implementation that supports both confluent-kafka and kafka-python libraries with SQLite database integration. It provides reliable message consumption and storage with proper transactional integrity.
-
-### Key Features
-
-1. **Dual Kafka Client Support**
-   - Compatible with both confluent-kafka and kafka-python libraries
-   - Seamless switching between implementations
-   - Consistent interface across both clients
-
-2. **SQLite Database Integration**
-   - Transactional message storage
-   - Automatic table creation
-   - Efficient batch processing
-   - Thread-safe database operations
-
-3. **Resilient Message Processing**
-   - Configurable retry mechanism
-   - Error handling with proper logging
-   - At-least-once delivery guarantee
-   - Proper offset management
-
-4. **Multi-threaded Architecture**
-   - Per-partition worker threads
-   - Thread-safe message queues
-   - Controlled concurrency
-   - Graceful shutdown handling
-
-### Usage
-
-```bash
-# Run with kafka-python implementation
-python script_db.py kafka-python
-
-# Run with confluent-kafka implementation
-python script_db.py confluent
-```
-
-### Configuration
-
-```python
-# Consumer configuration
-config = ConsumerConfig(
-    bootstrap_servers="localhost:9092",
-    group_id="my-group",
-    topics=["test-topic"],
     auto_offset_reset="earliest",
-    enable_auto_commit=False,
-    max_poll_records=500,
-    session_timeout_ms=30000,
-    heartbeat_interval_ms=10000,
-    max_poll_interval_ms=300000,
-    retry_count=3,
-    retry_interval=1.0
-)
-
-# Database configuration
-db_config = DatabaseConfig(
-    database="kafka_messages.db",
-    table_name="processed_messages",
-    create_table_if_not_exists=True
+    max_workers=4
 )
 ```
 
-### Message Processing Flow
+### Advanced Kafka Consumer
 
-1. **Message Consumption**
-   - Consumer polls messages from Kafka
-   - Messages are validated and decoded
-   - Metadata is extracted (topic, partition, offset)
+`advanced_kafka_consumer.py` provides a production-ready Kafka consumer with advanced features for resilience and scaling.
 
-2. **Processing**
-   - Messages are processed by worker threads
-   - Each partition has a dedicated worker
-   - Retry logic handles transient failures
+#### Key Features
 
-3. **Database Storage**
-   - Messages are stored in SQLite database
-   - Transactions ensure data consistency
-   - Offsets are committed after successful storage
+- **Partition-Aware Threading**: Dedicated worker threads per partition
+- **Fault Tolerance**: Automatic error recovery and partition pausing
+- **Batch Processing**: Configurable batch sizes and timeouts
+- **Health Monitoring**: Background health checks and statistics
+- **Error Thresholds**: Configurable error thresholds and recovery
 
-4. **Monitoring**
-   - Processing statistics are collected
-   - Worker thread health is monitored
-   - Error conditions are logged
-
-### Error Handling
-
-1. **Kafka Errors**
-   - Connection issues
-   - Partition rebalancing
-   - Message deserialization
-
-2. **Processing Errors**
-   - Invalid message format
-   - Business logic failures
-   - Resource constraints
-
-3. **Database Errors**
-   - Connection issues
-   - Transaction failures
-   - Schema violations
-
-### Best Practices
-
-1. **Configuration**
-   - Adjust batch sizes based on message size and processing time
-   - Set appropriate timeout values for your use case
-   - Configure retry parameters based on error patterns
-
-2. **Monitoring**
-   - Watch for consumer lag
-   - Monitor processing times
-   - Track error rates
-   - Check database performance
-
-3. **Maintenance**
-   - Regularly clean up old data
-   - Monitor disk space
-   - Review error logs
-   - Update configurations as needed
-
-## script_db_sqlserver.py Implementation
-
-`script_db_sqlserver.py` is a SQL Server-specific implementation of the Kafka consumer that provides robust message consumption and storage capabilities with Microsoft SQL Server as the backend database.
-
-### Key Features
-
-1. **SQL Server Integration**
-   - Full SQL Server support using pyodbc driver
-   - Optimized connection pooling for SQL Server
-   - SQL Server-specific schema and data types
-   - Proper index creation for performance
-
-2. **Dual Kafka Client Support**
-   - Compatible with both confluent-kafka and kafka-python libraries
-   - Consistent interface across both client implementations
-   - Client-specific configuration handling
-
-3. **Transactional Message Processing**
-   - ACID-compliant database operations
-   - Proper transaction management with commit/rollback
-   - Offset commits synchronized with database transactions
-   - Bulk insert operations for efficiency
-
-4. **Resilient Architecture**
-   - Configurable retry mechanism
-   - Error handling with proper logging
-   - Connection error recovery
-   - Graceful shutdown handling
-
-### Usage
+#### Usage
 
 ```bash
-# Run with confluent-kafka implementation
-python script_db_sqlserver.py confluent
+# Run with default configuration
+python advanced_kafka_consumer.py
+```
 
-# Run with kafka-python implementation
+#### Configuration
+
+```python
+# Advanced configuration example
+config = KafkaConfig(
+    bootstrap_servers="localhost:9092",
+    group_id="advanced-consumer-group",
+    topics=["my-topic"],
+    max_workers=4,
+    partition_workers=2,  # Workers per partition
+    batch_size=50,
+    batch_timeout_ms=5000,
+    max_retries=3,
+    error_threshold=10
+)
+```
+
+### Kafka SQL Server Consumer
+
+`kafka_sqlserver_consumer.py` and `script_db_sqlserver.py` provide integration between Kafka and SQL Server with transaction support.
+
+#### Key Features
+
+- **SQL Server Integration**: Full SQL Server support using pyodbc driver
+- **Transaction Management**: ACID-compliant database operations
+- **Partition Awareness**: Dedicated thread pools for each partition
+- **Idempotency**: Prevents duplicate message processing
+
+#### Usage
+
+```bash
+# Run kafka_sqlserver_consumer.py
+python kafka_sqlserver_consumer.py
+
+# Or run script_db_sqlserver.py with specific client
+python script_db_sqlserver.py confluent
 python script_db_sqlserver.py kafka-python
 ```
 
-### Configuration
+#### Database Schema
 
-```python
-# SQL Server configuration
-db_config = DatabaseConfig(
-    server=os.getenv("SQLSERVER_HOST", "localhost"),
-    port=int(os.getenv("SQLSERVER_PORT", "1433")),
-    database=os.getenv("SQLSERVER_DB", "kafka_messages"),
-    username=os.getenv("SQLSERVER_USER", "sa"),
-    password=os.getenv("SQLSERVER_PASSWORD", "Seeqwa1!Passw0rd"),
-    driver=os.getenv("SQLSERVER_DRIVER", "ODBC Driver 18 for SQL Server"),
-    table_name="processed_messages",
-    create_table_if_not_exists=True,
-    trust_server_certificate=True,
-    encrypt=True,
-    connection_timeout=30
-)
-
-# Consumer configuration
-consumer_config = ConsumerConfig(
-    bootstrap_servers=os.getenv("KAFKA_BOOTSTRAP_SERVERS", "localhost:9092"),
-    group_id="sqlserver-consumer-group",
-    topics=["test-topic"],
-    auto_offset_reset="earliest",
-    enable_auto_commit=False,
-    max_poll_records=500,
-    session_timeout_ms=30000,
-    heartbeat_interval_ms=10000,
-    max_poll_interval_ms=300000,
-    max_workers=4,
-    batch_size=100,
-    database_config=db_config,
-    enable_database_storage=True
-)
-```
-
-### Database Schema
-
-The script automatically creates the following SQL Server table structure:
+The consumers automatically create the following table structure:
 
 ```sql
 CREATE TABLE processed_messages (
     id VARCHAR(36) PRIMARY KEY,
     topic VARCHAR(255) NOT NULL,
     partition INT NOT NULL,
-    offset INT NOT NULL,
-    message_key VARCHAR(255),
+    offset BIGINT NOT NULL,
+    message_key TEXT,
     message_value TEXT NOT NULL,
     message_headers TEXT,
     consumer_group VARCHAR(255) NOT NULL,
-    processing_time FLOAT,
+    processing_timestamp DATETIME NOT NULL,
     processing_status VARCHAR(50) NOT NULL,
-    error_message TEXT,
-    created_at DATETIME NOT NULL,
-    updated_at DATETIME NOT NULL
+    error_message TEXT
 );
-
--- Indexes for better performance
-CREATE INDEX idx_processed_messages_topic_partition_offset ON processed_messages (topic, partition, offset);
-CREATE INDEX idx_processed_messages_status ON processed_messages (processing_status);
-CREATE INDEX idx_processed_messages_created_at ON processed_messages (created_at);
 ```
 
-### Environment Variables
+### Database Scripts
 
-| Variable | Description | Default |
-|----------|-------------|--------|
-| `SQLSERVER_HOST` | SQL Server hostname | localhost |
-| `SQLSERVER_PORT` | SQL Server port | 1433 |
-| `SQLSERVER_DB` | Database name | kafka_messages |
-| `SQLSERVER_USER` | Database username | sa |
-| `SQLSERVER_PASSWORD` | Database password | Seeqwa1!Passw0rd |
-| `SQLSERVER_DRIVER` | ODBC driver name | ODBC Driver 18 for SQL Server |
-| `KAFKA_BOOTSTRAP_SERVERS` | Kafka broker addresses | localhost:9092 |
+`script_db.py` is a SQLite-based implementation of the Kafka consumer that provides local database integration.
 
-### Best Practices
+#### Key Features
 
-1. **SQL Server Configuration**
-   - Use connection pooling for better performance
-   - Set appropriate connection timeouts
-   - Configure proper authentication
-   - Use parameterized queries for security
+- **SQLite Integration**: Local database storage with transaction support
+- **Thread-Safe Operations**: Proper database connection handling
+- **Batch Processing**: Efficient batch insertions
 
-2. **Performance Optimization**
-   - Use bulk inserts for better throughput
-   - Create appropriate indexes for your query patterns
-   - Monitor SQL Server query performance
-   - Consider table partitioning for large datasets
+#### Usage
 
-3. **Maintenance**
-   - Implement regular data cleanup
-   - Monitor SQL Server logs
-   - Check for database growth
-   - Maintain index statistics
+```bash
+# Run with confluent-kafka implementation
+python script_db.py confluent
+
+# Run with kafka-python implementation
+python script_db.py kafka-python
+```
+
+### Utility Scripts
+
+#### MongoDB Health Check
+
+`mongo_health.py` verifies MongoDB replica set status and connectivity.
+
+```bash
+python mongo_health.py
+```
+
+#### Driver Checker
+
+`check_drivers.py` verifies the availability of database drivers.
+
+```bash
+python check_drivers.py
+```
+
+#### Example Usage
+
+`example_usage.py` provides examples of different consumer configurations.
+
+```bash
+# Run basic example
+python example_usage.py basic
+
+# Run multi-topic example
+python example_usage.py multi
+
+# Run monitoring example
+python example_usage.py monitoring
+```
+
+## Docker Configurations
+
+This project includes Docker Compose files for setting up the required infrastructure.
+
+### Docker Compose
+
+#### Main Docker Compose File (`docker-compose.yml`)
+
+Sets up the core services including Kafka, Schema Registry, SQL Server, and Kafka Connect.
+
+```yaml
+# Key services defined in docker-compose.yml:
+#  - zookeeper: Kafka coordination service
+#  - kafka: Kafka broker
+#  - schema-registry: Schema validation and compatibility
+#  - kafka-connect: Integration platform for data pipelines
+#  - control-center: Confluent Control Center for monitoring
+#  - sqlserver: Microsoft SQL Server instance
+```
+
+#### MongoDB Docker Compose File (`docker-compose-mongo.yaml`)
+
+Sets up a MongoDB replica set for advanced scenarios.
+
+```yaml
+# Key services in docker-compose-mongo.yaml:
+#  - mongo1, mongo2, mongo3: MongoDB replica set nodes
+```
+
+### MongoDB Configuration
+
+#### Replica Set Initialization
+
+MongoDB is configured with a replica set for high availability:
+
+1. The MongoDB containers initialize with the replica set configuration
+2. Authentication is set up using the keyfile
+3. Initial data is loaded through the `mongo-init/01-init.js` script
+
+#### Connection String
+
+After initialization, connect to MongoDB using:
+
+```
+mongodb://username:password@mongo1:27017,mongo2:27018,mongo3:27019/database?replicaSet=rs0&authSource=admin
+```
+
+### Volume Management
+
+Docker volumes are used for persistent storage:
+
+```yaml
+volumes:
+  zookeeper-data: # Stores ZooKeeper data
+  kafka-data: # Stores Kafka data
+  mongo1-data: # MongoDB primary data
+  mongo2-data: # MongoDB secondary data
+  mongo3-data: # MongoDB secondary data
+  sqlserver-data: # SQL Server data
+```
+
+To clean up and start fresh:
+
+```bash
+docker-compose down -v
+```
+
+## Usage Examples
+
+### Basic Message Processing
+
+Here's an example of a simple message handler function for the advanced consumer:
+
+```python
+def handle_message_batch(messages):
+    for msg in messages:
+        topic = msg.topic()
+        partition = msg.partition()
+        offset = msg.offset()
+        key = msg.key().decode('utf-8') if msg.key() else None
+        value = msg.value().decode('utf-8')
+        
+        # Process message
+        print(f"Processing: Topic={topic}, Partition={partition}, Offset={offset}")
+        print(f"Message: Key={key}, Value={value}")
+        
+        # Your business logic here
+    
+    # Return True if processing succeeded, False otherwise
+    return True
+```
+
+### SQL Server Consumer Example
+
+Example of using the SQL Server integrated consumer:
+
+```python
+from script_db_sqlserver import ConsumerConfig, DatabaseConfig, run_confluent_consumer
+
+# Configure the consumer
+consumer_config = ConsumerConfig(
+    bootstrap_servers="localhost:9092",
+    group_id="sqlserver-group",
+    topics=["orders", "users"],
+    auto_offset_reset="earliest"
+)
+
+# Configure the database connection
+db_config = DatabaseConfig(
+    server="localhost",
+    port=1433,
+    database="kafka_db",
+    username="sa",
+    password="YourPassword123!",
+    driver="ODBC Driver 18 for SQL Server",
+    trust_server_certificate=True
+)
+
+# Run the consumer
+run_confluent_consumer(consumer_config, db_config)
+```
+
+### Advanced Consumer with Custom Configuration
+
+```python
+from advanced_kafka_consumer import KafkaConfig, AdvancedKafkaConsumer
+
+# Configure the consumer
+config = KafkaConfig(
+    bootstrap_servers="localhost:9092",
+    group_id="advanced-group",
+    topics=["high-volume-topic"],
+    batch_size=100,             # Process 100 messages per batch
+    batch_timeout_ms=30000,     # Wait up to 30 seconds for a batch
+    error_threshold=5,          # Pause partition after 5 consecutive errors
+    error_timeout_ms=60000,     # Resume partition after 1 minute
+    stats_interval_ms=10000,    # Report stats every 10 seconds
+    commit_interval_ms=5000,    # Commit offsets every 5 seconds
+    partition_workers=2,        # Dedicate 2 threads per partition
+    max_retries=3              # Retry failed batches 3 times
+)
+
+# Define a message handler
+def process_messages(messages):
+    # Your processing logic here
+    for msg in messages:
+        print(f"Processing message: {msg.value().decode('utf-8')}")
+    return True
+
+# Create and run the consumer
+consumer = AdvancedKafkaConsumer(config, process_messages)
+consumer.start()
+
+# To shutdown gracefully
+# consumer.stop()
+```
+
+## Best Practices
+
+### Consumer Configuration
+
+1. **Group ID Management**
+   - Use unique group IDs for different applications
+   - Use consistent group IDs for scaled instances of the same application
+
+2. **Offset Management**
+   - Commit offsets only after successful processing
+   - Use at-least-once semantics for critical data
+
+3. **Error Handling**
+   - Implement proper retry logic with backoff
+   - Use dead-letter topics for unprocessable messages
+
+### Database Integration
+
+1. **Connection Pooling**
+   - Use connection pools for better performance
+   - Monitor and tune pool sizes based on workload
+
+2. **Transaction Management**
+   - Use transactions to ensure data consistency
+   - Commit database transactions and Kafka offsets atomically when possible
+
+3. **Idempotency**
+   - Design your database operations to be idempotent
+   - Use unique message IDs to prevent duplicate processing
+
+### Docker Environment
+
+1. **Volume Management**
+   - Use named volumes for data persistence
+   - Regularly backup volume data
+
+2. **Resource Allocation**
+   - Set appropriate memory limits for containers
+   - Monitor container resource usage
+
+3. **Networking**
+   - Use internal Docker networks for service communication
+   - Expose only necessary ports to the host
+
+## Performance Tuning
+
+### Kafka Consumer Tuning
+
+1. **Batch Size**
+   - Increase batch size for higher throughput
+   - Default: `50`
+   - High volume: `100-200`
+
+2. **Worker Threads**
+   - Base thread count on available CPU cores
+   - Default: `4`
+   - Formula: `2 × CPU cores`
+
+3. **Partition Workers**
+   - Balance between partition count and available resources
+   - Default: `1`
+   - High throughput: `2-3`
+
+4. **Commit Interval**
+   - Balance between throughput and potential duplicate processing
+   - Default: `5000ms`
+   - Low latency: `1000-2000ms`
+
+### SQL Server Tuning
+
+1. **Connection Pool**
+   - Set appropriate pool size
+   - Default: `5`
+   - Formula: `2 × worker_threads + 1`
+
+2. **Bulk Inserts**
+   - Use batch operations for better performance
+   - Optimal batch size: `500-1000` rows
+
+3. **Indexing**
+   - Create indexes on frequently queried columns
+   - Essential indexes:
+     - Primary key on message ID
+     - Composite index on (topic, partition, offset)
+
+### Docker Service Tuning
+
+1. **Kafka Broker**
+   - Increase heap size: `-Xmx4g -Xms4g`
+   - Adjust `num.partitions` based on consumer count
+
+2. **MongoDB**
+   - Increase WiredTiger cache: `--wiredTigerCacheSizeGB 2`
+   - Enable journaling for data safety
+
+## Troubleshooting
+
+### Common Issues
+
+#### Kafka Consumer Issues
+
+| Issue | Symptoms | Resolution |
+|-------|----------|------------|
+| Consumer rebalancing too frequently | Processing delays, log messages about rebalancing | Increase `session.timeout.ms` and `heartbeat.interval.ms` |
+| Slow message processing | High lag, consumer group falling behind | Increase batch size, add more worker threads |
+| Duplicate message processing | Same message processed multiple times | Check for proper offset commits, ensure idempotent operations |
+| Out of memory errors | Consumer crashes with OOM errors | Reduce batch size, check for memory leaks |
+
+#### Database Connection Issues
+
+| Issue | Symptoms | Resolution |
+|-------|----------|------------|
+| Connection pool exhaustion | "No available connections" errors | Increase pool size, reduce connection holding time |
+| SQL Server connection failures | Connection timeout errors | Check network, credentials, and SQL Server state |
+| Deadlocks | Transaction failures, deadlock victim errors | Review transaction isolation level, optimize query patterns |
+
+#### Docker Issues
+
+| Issue | Symptoms | Resolution |
+|-------|----------|------------|
+| Container fails to start | "Exit code 1" or specific error messages | Check logs with `docker-compose logs <service>` |
+| Service unreachable | Connection refused errors | Verify service is running and ports are exposed correctly |
+| Volume permission issues | Access denied errors | Check file permissions, use appropriate user in containers |
+
+### Diagnostic Commands
+
+#### Kafka
+
+```bash
+# List consumer groups
+docker-compose exec kafka kafka-consumer-groups --bootstrap-server localhost:9092 --list
+
+# Check consumer group lag
+docker-compose exec kafka kafka-consumer-groups --bootstrap-server localhost:9092 --describe --group <group-id>
+
+# List topics
+docker-compose exec kafka kafka-topics --bootstrap-server localhost:9092 --list
+```
+
+#### MongoDB
+
+```bash
+# Check replica set status
+docker-compose exec mongo1 mongosh --eval "rs.status()"
+
+# Verify connectivity
+python mongo_health.py
+```
+
+#### SQL Server
+
+```bash
+# Check if SQL Server container is running
+docker-compose ps sqlserver
+
+# Test database connection
+python check_drivers.py
+```
