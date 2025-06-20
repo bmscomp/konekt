@@ -4,6 +4,7 @@ Partition-aware and resilient Kafka consumers with multi-threading support.
 Includes implementations for both confluent-kafka and kafka-python libraries.
 """
 
+import json
 import logging
 import signal
 import sys
@@ -630,11 +631,11 @@ def sample_message_handler(message: Any) -> bool:
         time.sleep(0.1)
         
         # Example: Process JSON messages
-        if isinstance(message, str):
-            data = message
-            logger.info(f"Processed message: {data.get('id', 'unknown')}")
-        else:
-            logger.info(f"Processed message: {message}")
+        #if isinstance(message, str):
+            #data = json.loads(message)
+            #logger.info(f"Processed message: {data['_id']}")
+        #else:
+            #logger.error(f"Processed message: {message}")
         
         return True
     except Exception as e:
@@ -656,7 +657,7 @@ def run_confluent_consumer_example():
             return
         
         # Check if test-topic exists
-        if 'test-topic' not in topics.topics:
+        if 'mongo.pages_topic' not in topics.topics:
             logger.error("test-topic does not exist")
             return
             
@@ -667,7 +668,7 @@ def run_confluent_consumer_example():
     config = ConsumerConfig(
         bootstrap_servers="localhost:9092",
         group_id="confluent-consumer-group",
-        topics=["test-topic"],
+        topics=["mongo.pages_topic"],
         max_workers=4,
         batch_size=10
     )

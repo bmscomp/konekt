@@ -21,7 +21,7 @@ def load_jsonl_files_to_mongodb(data_directory, db, collection):
     # Get all .jsonl files in directory
     jsonl_files = [
         f for f in os.listdir(data_directory) 
-        if f.endswith('.jsonll') and os.path.isfile(os.path.join(data_directory, f))
+        if f.endswith('.jsonl') and os.path.isfile(os.path.join(data_directory, f))
     ]
     
     if not jsonl_files:
